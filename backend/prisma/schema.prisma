@@ -1,0 +1,155 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  ACCOUNT_HOLDER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  CLOSED
+}
+
+enum OnboardingStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+}
+
+enum AccountStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  CLOSED
+}
+
+enum AccountType {
+  USER
+  PLATFORM_CLEARING
+}
+
+enum LedgerDirection {
+  DEBIT
+  CREDIT
+}
+
+model User {
+  id           String     @id @default(uuid())
+  email        String     @unique
+  passwordHash String
+  fullName     String
+  role         Role       @default(ACCOUNT_HOLDER)
+  status       UserStatus @default(ACTIVE)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  onboarding   Onboarding?
+  accounts     Account[]
+  auditLogs    AuditLog[]
+  reviewedOnboardings Onboarding[] @relation("ReviewedByAdmin")
+
+  @@map("users")
+}
+
+model Onboarding {
+  id               String           @id @default(uuid())
+  userId           String           @unique
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status           OnboardingStatus @default(DRAFT)
+  
+  legalName        String?
+  dateOfBirth      String?
+  phoneNumber      String?
+  streetAddress    String?
+  city             String?
+  state            String?
+  postalCode       String?
+  country          String?
+  idType           String?
+  idNumber         String?
+  occupation       String?
+  sourceOfFunds    String?
+  documentMetadata Json?
+
+  reviewNotes      String?
+  reviewedById     String?
+  reviewedBy       User?            @relation("ReviewedByAdmin", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  submittedAt      DateTime?
+  reviewedAt       DateTime?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  @@map("onboardings")
+}
+
+model Account {
+  id            String        @id @default(uuid())
+  userId        String?
+  user          User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accountNumber String        @unique
+  status        AccountStatus @default(ACTIVE)
+  currency      String        @default("USD")
+  accountType   AccountType   @default(USER)
+  cachedBalance Int           @default(0) // Integer in smallest currency units (cents)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  entries       LedgerEntry[]
+
+  @@map("accounts")
+}
+
+model LedgerTransaction {
+  id          String        @id @default(uuid())
+  reference   String        @unique
+  description String
+  createdById String?
+  createdAt   DateTime      @default(now())
+
+  entries     LedgerEntry[]
+
+  @@map("ledger_transactions")
+}
+
+model LedgerEntry {
+  id            String            @id @default(uuid())
+  transactionId String
+  transaction   LedgerTransaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  accountId     String
+  account       Account           @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  direction     LedgerDirection
+  amount        Int               // Smallest unit (e.g. cents) - must be > 0
+  createdAt     DateTime          @default(now())
+
+  @@map("ledger_entries")
+}
+
+model AuditLog {
+  id           String   @id @default(uuid())
+  actorId      String
+  user         User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  action       String
+  resourceType String
+  resourceId   String
+  metadata     Json?
+  ip           String?
+  userAgent    String?
+  createdAt    DateTime @default(now())
+
+  @@index([actorId])
+  @@index([action])
+  @@index([resourceType, resourceId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+

@@ -1,0 +1,18 @@
+{
+  "name": "balance-vault-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "BalanceVault - Money Movement with a Ledger You Can Prove",
+  "scripts": {
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "build:backend": "npm --prefix backend run build",
+    "build:frontend": "npm --prefix frontend run build",
+    "build": "npm run build:backend && npm run build:frontend",
+    "test:backend": "npm --prefix backend test"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
+
