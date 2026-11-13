@@ -27,16 +27,16 @@
 
 | # | Task | Status | Commit |
 |---|------|--------|--------|
-| 7 | Create AGENTS.md progress tracker | ✅ Done | `Current` |
-| 8 | Create docker-compose.dev.yml (DB + Redis only for local dev) | ✅ Done | `Current` |
-| 9 | Create .env for local development | ✅ Done | `Current` |
-| 10 | Fix: Add AppError class for proper HTTP status codes (root cause #2 of 502) | ✅ Done | `Current` |
-| 11 | Run Prisma migrations to create tables (root cause #1 of 502) | ✅ Done | `Current` |
-| 12 | Run seed to create admin user + clearing account | ✅ Done | `Current` |
-| 13 | Fix backend Dockerfile (migrations + entrypoint) | ✅ Done | `Current` |
-| 14 | Test all API endpoints locally (34/34 passing) | ✅ Done | `Current` |
-| 15 | Integration tests for login flow & full banking workflow | ✅ Done | `Current` |
-| 16 | Ponytail cleanup audit (lean dependencies, YAGNI) | ✅ Done | `Current` |
+| 7 | Create AGENTS.md progress tracker | ✅ Done | `e969008` |
+| 8 | Create docker-compose.dev.yml (DB + Redis only for local dev) | ✅ Done | `e969008` |
+| 9 | Create .env for local development | ✅ Done | `d0de8ab` |
+| 10 | Fix: Add AppError class for proper HTTP status codes (root cause #2 of 502) | ✅ Done | `d0de8ab` |
+| 11 | Run Prisma migrations to create tables (root cause #1 of 502) | ✅ Done | `d0de8ab` |
+| 12 | Run seed to create admin user + clearing account | ✅ Done | `d0de8ab` |
+| 13 | Fix backend Dockerfile (migrations + entrypoint) | ✅ Done | `d0de8ab` |
+| 14 | Test all API endpoints locally (34/34 passing) | ✅ Done | `291e87e` |
+| 15 | Integration tests for login flow & full banking workflow | ✅ Done | `291e87e` |
+| 16 | Ponytail cleanup audit (lean dependencies, YAGNI) | ✅ Done | `291e87e` |
 | 17 | Update Code Review Graph | ✅ Done | `Current` |
 
 ---
