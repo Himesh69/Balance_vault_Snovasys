@@ -44,14 +44,14 @@
 
 | # | Task | Status | Commit |
 |---|------|--------|--------|
-| 19 | Track BalanceVault-UI-Spec.md visual design specification | ✅ Done | `Current` |
-| 20 | Configure tokens & typography (Newsreader, IBM Plex Sans, IBM Plex Mono) | ✅ Done | `Current` |
-| 21 | Build core UI primitives (Button, Input, Badge, MoneyCell, Panel, Banner, Dialog, Stepper, DefinitionList) | ✅ Done | `Current` |
-| 22 | Flush 232px left rail shell + top breadcrumb strip (AppShell) | ✅ Done | `Current` |
-| 23 | Redesign Auth screens: Login & Register with document header & rate limit timer | ✅ Done | `Current` |
-| 24 | Redesign Account Holder views: Dashboard (single statement figure), Accounts (review movement), Ledger, Onboarding | ✅ Done | `Current` |
-| 25 | Redesign Admin views: Users, Onboarding Queue with adjudication dossier, Flagship Audit Logs, Accounts | ✅ Done | `Current` |
-| 26 | Verify 0 backend changes & 100% build & test pass (34/34 tests passing) | ✅ Done | `Current` |
+| 19 | Track BalanceVault-UI-Spec.md visual design specification | ✅ Done | `4171eb2` |
+| 20 | Configure tokens & typography (Newsreader, IBM Plex Sans, IBM Plex Mono) | ✅ Done | `4171eb2` |
+| 21 | Build core UI primitives (Button, Input, Badge, MoneyCell, Panel, Banner, Dialog, Stepper, DefinitionList) | ✅ Done | `4171eb2` |
+| 22 | Flush 232px left rail shell + top breadcrumb strip (AppShell) | ✅ Done | `4171eb2` |
+| 23 | Redesign Auth screens: Login & Register with document header & rate limit timer | ✅ Done | `4171eb2` |
+| 24 | Redesign Account Holder views: Dashboard (single statement figure), Accounts (review movement), Ledger, Onboarding | ✅ Done | `4171eb2` |
+| 25 | Redesign Admin views: Users, Onboarding Queue with adjudication dossier, Flagship Audit Logs, Accounts | ✅ Done | `4171eb2` |
+| 26 | Verify 0 backend changes & 100% build & test pass (34/34 tests passing) | ✅ Done | `4171eb2` |
 
 ---
 
