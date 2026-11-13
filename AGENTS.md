@@ -54,6 +54,15 @@
 | 26 | Verify 0 backend changes & 100% build & test pass (34/34 tests passing) | ✅ Done | `4171eb2` |
 | 27 | Center Login and Register forms and re-write production docker-compose.yml | ✅ Done | `fc7154b` |
 
+### 2026-11-13 — Docker Hub Push, Render Blueprint & README
+
+| # | Task | Status | Commit |
+|---|------|--------|--------|
+| 28 | Push `himesh723/balancevault-api:d6688b1` to Docker Hub (150 MB compressed) | ✅ Done | `d6688b1` |
+| 29 | Push `himesh723/balancevault-frontend:d6688b1` to Docker Hub (26 MB compressed) | ✅ Done | `d6688b1` |
+| 30 | Create render.yaml Render Blueprint — validated against official JSON schema (0 errors) | ✅ Done | — |
+| 31 | Create professional README.md with architecture, API reference, deploy guides | ✅ Done | — |
+
 ---
 
 ## 502 Root Cause Analysis
