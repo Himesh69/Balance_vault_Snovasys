@@ -37,7 +37,8 @@
 | 14 | Test all API endpoints locally (34/34 passing) | ✅ Done | `291e87e` |
 | 15 | Integration tests for login flow & full banking workflow | ✅ Done | `291e87e` |
 | 16 | Ponytail cleanup audit (lean dependencies, YAGNI) | ✅ Done | `291e87e` |
-| 17 | Update Code Review Graph | ✅ Done | `Current` |
+| 17 | Update Code Review Graph | ✅ Done | `e06c3f3` |
+| 18 | Run application (Docker: DB+Redis, Host: Backend+Frontend) | ✅ Done | `Active` |
 
 ---
 
