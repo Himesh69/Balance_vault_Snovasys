@@ -63,6 +63,7 @@
 | 30 | Create render.yaml Render Blueprint — validated against official JSON schema (0 errors) | ✅ Done | `7c427f4` |
 | 31 | Create professional README.md with architecture, API reference, deploy guides | ✅ Done | `7c427f4` |
 | 32 | Fix Nginx boot crash on Render: dynamic resolver + BACKEND_URL variable substitution | ✅ Done | `466a1cb` |
+| 33 | Fix Prisma Alpine crash on Render: add openssl & libc6-compat to backend Dockerfile | ✅ Done | — |
 
 ---
 
