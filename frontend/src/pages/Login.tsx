@@ -62,7 +62,7 @@ export const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-paper text-ink flex flex-col justify-start px-6 pt-[14vh] pb-12 items-center sm:items-start sm:pl-[12vw]">
+    <div className="min-h-screen bg-paper text-ink flex flex-col justify-center items-center px-6 py-12">
       <div className="w-full max-w-[440px]">
         {/* Document Header Wordmark & Tagline */}
         <div className="mb-6 select-none text-left">
