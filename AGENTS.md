@@ -64,6 +64,7 @@
 | 31 | Create professional README.md with architecture, API reference, deploy guides | ✅ Done | `7c427f4` |
 | 32 | Fix Nginx boot crash on Render: dynamic resolver + BACKEND_URL variable substitution | ✅ Done | `466a1cb` |
 | 33 | Fix Prisma Alpine crash on Render: add openssl & libc6-compat to backend Dockerfile | ✅ Done | `91669f6` |
+| 34 | Configure frontend Nginx to proxy directly to live Render backend with SNI and Host | ✅ Done | — |
 
 ---
 
