@@ -52,7 +52,7 @@
 | 24 | Redesign Account Holder views: Dashboard (single statement figure), Accounts (review movement), Ledger, Onboarding | ✅ Done | `4171eb2` |
 | 25 | Redesign Admin views: Users, Onboarding Queue with adjudication dossier, Flagship Audit Logs, Accounts | ✅ Done | `4171eb2` |
 | 26 | Verify 0 backend changes & 100% build & test pass (34/34 tests passing) | ✅ Done | `4171eb2` |
-| 27 | Center Login and Register forms and re-write production docker-compose.yml | ✅ Done | `Current` |
+| 27 | Center Login and Register forms and re-write production docker-compose.yml | ✅ Done | `fc7154b` |
 
 ---
 
