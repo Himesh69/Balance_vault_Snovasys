@@ -4,6 +4,7 @@ import { Role, UserStatus, OnboardingStatus } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
 import { env } from '../config/env.js';
 import { AuditService } from './AuditService.js';
+import { AppError } from '../lib/AppError.js';
 
 export interface RegisterDTO {
   email: string;
@@ -27,7 +28,7 @@ export class AuthService {
     });
 
     if (existing) {
-      throw new Error('User with this email already exists');
+      throw new AppError('User with this email already exists', 409);
     }
 
     // Hash password with bcrypt cost factor >= 12 (PRD 6.1)
@@ -99,16 +100,16 @@ export class AuthService {
 
     if (!user) {
       // Record failure audit log if needed
-      throw new Error('Invalid email or password');
+      throw new AppError('Invalid email or password', 401);
     }
 
     const isMatch = await bcrypt.compare(dto.password, user.passwordHash);
     if (!isMatch) {
-      throw new Error('Invalid email or password');
+      throw new AppError('Invalid email or password', 401);
     }
 
     if (user.status !== UserStatus.ACTIVE) {
-      throw new Error(`Your account is ${user.status}. Please contact support.`);
+      throw new AppError(`Your account is ${user.status}. Please contact support.`, 403);
     }
 
     const token = jwt.sign(
@@ -151,7 +152,7 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new Error('User not found');
+      throw new AppError('User not found', 404);
     }
 
     return {

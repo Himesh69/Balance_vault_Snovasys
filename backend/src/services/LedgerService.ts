@@ -1,6 +1,7 @@
 import { Prisma, LedgerDirection, AccountStatus, AccountType } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
 import { AuditService } from './AuditService.js';
+import { AppError } from '../lib/AppError.js';
 
 export interface EntryDraft {
   accountId: string;
@@ -54,7 +55,7 @@ export class LedgerService {
     options: MovementOptions
   ) {
     if (!entries || entries.length < 2) {
-      throw new Error('Ledger transaction must contain at least 2 entries');
+      throw new AppError('Ledger transaction must contain at least 2 entries', 400);
     }
 
     let totalDebit = 0;
@@ -62,7 +63,7 @@ export class LedgerService {
 
     for (const entry of entries) {
       if (!Number.isInteger(entry.amount) || entry.amount <= 0) {
-        throw new Error(`Invalid entry amount: ${entry.amount}. Must be positive integer.`);
+        throw new AppError(`Invalid entry amount: ${entry.amount}. Must be positive integer.`, 400);
       }
 
       if (entry.direction === LedgerDirection.DEBIT) {
@@ -70,14 +71,15 @@ export class LedgerService {
       } else if (entry.direction === LedgerDirection.CREDIT) {
         totalCredit += entry.amount;
       } else {
-        throw new Error(`Invalid ledger direction: ${entry.direction}`);
+        throw new AppError(`Invalid ledger direction: ${entry.direction}`, 400);
       }
     }
 
     // PRD Section 13: For every transaction: SUM(debit amounts) = SUM(credit amounts)
     if (totalDebit !== totalCredit) {
-      throw new Error(
-        `Ledger imbalance detected: Total Debit (${totalDebit}) does not equal Total Credit (${totalCredit})`
+      throw new AppError(
+        `Ledger imbalance detected: Total Debit (${totalDebit}) does not equal Total Credit (${totalCredit})`,
+        400
       );
     }
 
@@ -94,11 +96,11 @@ export class LedgerService {
           });
 
           if (!acc) {
-            throw new Error(`Account not found: ${entry.accountId}`);
+            throw new AppError(`Account not found: ${entry.accountId}`, 404);
           }
 
           if (acc.status !== AccountStatus.ACTIVE) {
-            throw new Error(`Account ${acc.accountNumber} is not ACTIVE (status: ${acc.status})`);
+            throw new AppError(`Account ${acc.accountNumber} is not ACTIVE (status: ${acc.status})`, 400);
           }
 
           accountMap.set(entry.accountId, acc);
@@ -110,8 +112,9 @@ export class LedgerService {
         const acc = accountMap.get(entry.accountId);
         if (acc.accountType === AccountType.USER && entry.direction === LedgerDirection.DEBIT) {
           if (acc.cachedBalance < entry.amount) {
-            throw new Error(
-              `Insufficient funds in account ${acc.accountNumber}. Available: ${acc.cachedBalance}, requested: ${entry.amount}`
+            throw new AppError(
+              `Insufficient funds in account ${acc.accountNumber}. Available: ${acc.cachedBalance}, requested: ${entry.amount}`,
+              400
             );
           }
         }

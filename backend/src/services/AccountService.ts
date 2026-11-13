@@ -2,6 +2,7 @@ import { AccountStatus, AccountType } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
 import { AuditService } from './AuditService.js';
 import { LedgerService } from './LedgerService.js';
+import { AppError } from '../lib/AppError.js';
 
 export class AccountService {
   static async getAccountsForUser(userId: string) {
@@ -26,7 +27,7 @@ export class AccountService {
     });
 
     if (!account) {
-      throw new Error('Account not found');
+      throw new AppError('Account not found', 404);
     }
 
     return account;
@@ -80,13 +81,14 @@ export class AccountService {
     const account = await this.getAccountById(accountId);
 
     if (account.accountType === AccountType.PLATFORM_CLEARING) {
-      throw new Error('Platform clearing account cannot be deleted');
+      throw new AppError('Platform clearing account cannot be deleted', 400);
     }
 
     // Business rule: Check if account has non-zero balance
     if (account.cachedBalance !== 0) {
-      throw new Error(
-        `Cannot delete account with non-zero balance (${account.cachedBalance} cents). Balance must be zero.`
+      throw new AppError(
+        `Cannot delete account with non-zero balance (${account.cachedBalance} cents). Balance must be zero.`,
+        400
       );
     }
 

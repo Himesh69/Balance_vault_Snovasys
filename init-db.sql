@@ -19,7 +19,15 @@ $do$;
 GRANT CONNECT ON DATABASE balancevault TO balancevault_app;
 GRANT CONNECT ON DATABASE balancevault TO balancevault_migrator;
 
--- Default schema permissions
+-- Schema permissions
+GRANT ALL ON SCHEMA public TO balancevault_migrator;
+GRANT USAGE ON SCHEMA public TO balancevault_app;
+
+-- Default schema permissions for objects created by balancevault or balancevault_migrator
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO balancevault_app;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO balancevault_app;
+
+ALTER DEFAULT PRIVILEGES FOR ROLE balancevault_migrator IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO balancevault_app;
+ALTER DEFAULT PRIVILEGES FOR ROLE balancevault_migrator IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO balancevault_app;
+
 

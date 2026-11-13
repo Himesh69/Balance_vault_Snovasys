@@ -1,6 +1,7 @@
 import { UserStatus, Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
 import { AuditService } from './AuditService.js';
+import { AppError } from '../lib/AppError.js';
 
 export class AdminService {
   static async listUsers(options: {
@@ -75,7 +76,7 @@ export class AdminService {
     });
 
     if (!user) {
-      throw new Error('User not found');
+      throw new AppError('User not found', 404);
     }
 
     // Exclude password hash from response
@@ -91,7 +92,7 @@ export class AdminService {
   ) {
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
-      throw new Error('User not found');
+      throw new AppError('User not found', 404);
     }
 
     const updated = await prisma.$transaction(async (tx) => {
@@ -138,14 +139,15 @@ export class AdminService {
     });
 
     if (!user) {
-      throw new Error('User not found');
+      throw new AppError('User not found', 404);
     }
 
     // Check if user has non-zero balances in any accounts
     const nonZeroAccount = user.accounts.find((a) => a.cachedBalance !== 0);
     if (nonZeroAccount) {
-      throw new Error(
-        `Cannot delete user with non-zero account balance (Account ${nonZeroAccount.accountNumber} has ${nonZeroAccount.cachedBalance} cents)`
+      throw new AppError(
+        `Cannot delete user with non-zero account balance (Account ${nonZeroAccount.accountNumber} has ${nonZeroAccount.cachedBalance} cents)`,
+        400
       );
     }
 

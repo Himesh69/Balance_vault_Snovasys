@@ -1,6 +1,7 @@
 import { OnboardingStatus, AccountStatus, AccountType } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
 import { AuditService } from './AuditService.js';
+import { AppError } from '../lib/AppError.js';
 
 export interface UpdateOnboardingDraftDTO {
   legalName?: string;
@@ -69,11 +70,11 @@ export class OnboardingService {
     const current = await this.getOnboarding(userId);
 
     if (current.status === OnboardingStatus.SUBMITTED) {
-      throw new Error('Cannot edit onboarding while application is pending review');
+      throw new AppError('Cannot edit onboarding while application is pending review', 400);
     }
 
     if (current.status === OnboardingStatus.APPROVED) {
-      throw new Error('Onboarding application has already been approved');
+      throw new AppError('Onboarding application has already been approved', 400);
     }
 
     const updated = await prisma.onboarding.update({
@@ -107,11 +108,11 @@ export class OnboardingService {
     const current = await this.getOnboarding(userId);
 
     if (current.status === OnboardingStatus.SUBMITTED) {
-      throw new Error('Onboarding application is already submitted and pending review');
+      throw new AppError('Onboarding application is already submitted and pending review', 400);
     }
 
     if (current.status === OnboardingStatus.APPROVED) {
-      throw new Error('Onboarding application has already been approved');
+      throw new AppError('Onboarding application has already been approved', 400);
     }
 
     // Validate required fields for submission per PRD 6.2
@@ -130,7 +131,7 @@ export class OnboardingService {
 
     const missing = requiredFields.filter((f) => !current[f] || String(current[f]).trim() === '');
     if (missing.length > 0) {
-      throw new Error(`Missing required onboarding fields: ${missing.join(', ')}`);
+      throw new AppError(`Missing required onboarding fields: ${missing.join(', ')}`, 400);
     }
 
     const updated = await prisma.onboarding.update({
@@ -173,11 +174,11 @@ export class OnboardingService {
     });
 
     if (!onboarding) {
-      throw new Error('Onboarding record not found');
+      throw new AppError('Onboarding record not found', 404);
     }
 
     if (onboarding.status !== OnboardingStatus.SUBMITTED) {
-      throw new Error(`Cannot approve onboarding with status ${onboarding.status}. Must be SUBMITTED.`);
+      throw new AppError(`Cannot approve onboarding with status ${onboarding.status}. Must be SUBMITTED.`, 400);
     }
 
     return await prisma.$transaction(async (tx) => {
@@ -269,11 +270,11 @@ export class OnboardingService {
     });
 
     if (!onboarding) {
-      throw new Error('Onboarding record not found');
+      throw new AppError('Onboarding record not found', 404);
     }
 
     if (onboarding.status !== OnboardingStatus.SUBMITTED) {
-      throw new Error(`Cannot reject onboarding with status ${onboarding.status}. Must be SUBMITTED.`);
+      throw new AppError(`Cannot reject onboarding with status ${onboarding.status}. Must be SUBMITTED.`, 400);
     }
 
     return await prisma.$transaction(async (tx) => {
