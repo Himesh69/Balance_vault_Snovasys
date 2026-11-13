@@ -66,3 +66,5 @@ services:
     envVars:
       - key: PORT
         value: "80"
+      - key: BACKEND_URL
+        value: "http://balancevault-api:4000"

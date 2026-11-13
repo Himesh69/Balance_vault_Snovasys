@@ -60,8 +60,9 @@
 |---|------|--------|--------|
 | 28 | Push `himesh723/balancevault-api:d6688b1` to Docker Hub (150 MB compressed) | ✅ Done | `d6688b1` |
 | 29 | Push `himesh723/balancevault-frontend:d6688b1` to Docker Hub (26 MB compressed) | ✅ Done | `d6688b1` |
-| 30 | Create render.yaml Render Blueprint — validated against official JSON schema (0 errors) | ✅ Done | — |
-| 31 | Create professional README.md with architecture, API reference, deploy guides | ✅ Done | — |
+| 30 | Create render.yaml Render Blueprint — validated against official JSON schema (0 errors) | ✅ Done | `7c427f4` |
+| 31 | Create professional README.md with architecture, API reference, deploy guides | ✅ Done | `7c427f4` |
+| 32 | Fix Nginx boot crash on Render: dynamic resolver + BACKEND_URL variable substitution | ✅ Done | — |
 
 ---
 
