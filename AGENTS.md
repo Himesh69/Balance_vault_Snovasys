@@ -38,7 +38,20 @@
 | 15 | Integration tests for login flow & full banking workflow | ✅ Done | `291e87e` |
 | 16 | Ponytail cleanup audit (lean dependencies, YAGNI) | ✅ Done | `291e87e` |
 | 17 | Update Code Review Graph | ✅ Done | `e06c3f3` |
-| 18 | Run application (Docker: DB+Redis, Host: Backend+Frontend) | ✅ Done | `Active` |
+| 18 | Run application (Docker: DB+Redis, Host: Backend+Frontend) | ✅ Done | `bb7a562` |
+
+### 2026-11-13 — Frontend Editorial Redesign (BalanceVault-UI-Spec)
+
+| # | Task | Status | Commit |
+|---|------|--------|--------|
+| 19 | Track BalanceVault-UI-Spec.md visual design specification | ✅ Done | `Current` |
+| 20 | Configure tokens & typography (Newsreader, IBM Plex Sans, IBM Plex Mono) | ✅ Done | `Current` |
+| 21 | Build core UI primitives (Button, Input, Badge, MoneyCell, Panel, Banner, Dialog, Stepper, DefinitionList) | ✅ Done | `Current` |
+| 22 | Flush 232px left rail shell + top breadcrumb strip (AppShell) | ✅ Done | `Current` |
+| 23 | Redesign Auth screens: Login & Register with document header & rate limit timer | ✅ Done | `Current` |
+| 24 | Redesign Account Holder views: Dashboard (single statement figure), Accounts (review movement), Ledger, Onboarding | ✅ Done | `Current` |
+| 25 | Redesign Admin views: Users, Onboarding Queue with adjudication dossier, Flagship Audit Logs, Accounts | ✅ Done | `Current` |
+| 26 | Verify 0 backend changes & 100% build & test pass (34/34 tests passing) | ✅ Done | `Current` |
 
 ---
 

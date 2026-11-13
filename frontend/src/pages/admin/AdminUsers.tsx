@@ -1,25 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { apiRequest } from '../../lib/api.js';
-import {
-  Users,
-  Search,
-  Trash2,
-  CheckCircle,
-  AlertCircle,
-  X,
-  UserCheck,
-  ShieldAlert
-} from 'lucide-react';
+import { Badge } from '../../components/ui/Badge.js';
+import { Button } from '../../components/ui/Button.js';
+import { Dialog } from '../../components/ui/Dialog.js';
+import { Banner } from '../../components/ui/Banner.js';
+import { DefinitionList } from '../../components/ui/DefinitionList.js';
 
 export const AdminUsers: React.FC = () => {
   const [users, setUsers] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [activeTab, setActiveTab] = useState<'ALL' | 'HOLDERS' | 'ADMINS' | 'SUSPENDED'>('ALL');
   const [loading, setLoading] = useState(true);
-  const [selectedUser, setSelectedUser] = useState<any>(null);
-  const [userModal, setUserModal] = useState(false);
-  const [deleteModal, setDeleteModal] = useState<any>(null);
+
+  // User detail modal state
+  const [detailUser, setDetailUser] = useState<any | null>(null);
+
+  // Action dialog states
+  const [statusDialog, setStatusDialog] = useState<{ user: any; newStatus: 'ACTIVE' | 'SUSPENDED' } | null>(null);
+  const [deleteDialog, setDeleteDialog] = useState<any | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
   const [actionFeedback, setActionFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const fetchUsers = async () => {
@@ -27,11 +27,24 @@ export const AdminUsers: React.FC = () => {
     try {
       const query = new URLSearchParams();
       if (search) query.append('search', search);
-      if (statusFilter) query.append('status', statusFilter);
+
+      if (activeTab === 'SUSPENDED') {
+        query.append('status', 'SUSPENDED');
+      }
+
       query.append('limit', '50');
 
       const data = await apiRequest(`/admin/users?${query.toString()}`);
-      setUsers(data.users || []);
+      let userList = data.users || [];
+
+      // Filter by role tab on client if needed
+      if (activeTab === 'HOLDERS') {
+        userList = userList.filter((u: any) => u.role === 'ACCOUNT_HOLDER');
+      } else if (activeTab === 'ADMINS') {
+        userList = userList.filter((u: any) => u.role === 'ADMIN');
+      }
+
+      setUsers(userList);
       setTotal(data.total || 0);
     } catch (err: any) {
       console.error('Failed to load users:', err);
@@ -42,295 +55,408 @@ export const AdminUsers: React.FC = () => {
 
   useEffect(() => {
     fetchUsers();
-  }, [statusFilter]);
+  }, [activeTab]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     fetchUsers();
   };
 
-  const handleStatusChange = async (userId: string, newStatus: string) => {
+  const openStatusChange = (user: any, newStatus: 'ACTIVE' | 'SUSPENDED') => {
+    setStatusDialog({ user, newStatus });
+  };
+
+  const confirmStatusChange = async () => {
+    if (!statusDialog) return;
+    setActionLoading(true);
     setActionFeedback(null);
     try {
-      await apiRequest(`/admin/users/${userId}`, {
+      await apiRequest(`/admin/users/${statusDialog.user.id}`, {
         method: 'PATCH',
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify({ status: statusDialog.newStatus }),
       });
-      setActionFeedback({ type: 'success', text: `User status changed to ${newStatus}` });
+      setActionFeedback({
+        type: 'success',
+        text: `User ${statusDialog.user.email} status changed to ${statusDialog.newStatus}.`,
+      });
+      setStatusDialog(null);
       fetchUsers();
     } catch (err: any) {
       setActionFeedback({ type: 'error', text: err.message || 'Status change failed.' });
+    } finally {
+      setActionLoading(false);
     }
   };
 
-  const handleConfirmDelete = async () => {
-    if (!deleteModal) return;
+  const confirmDelete = async () => {
+    if (!deleteDialog) return;
+    setActionLoading(true);
     setActionFeedback(null);
     try {
-      await apiRequest(`/admin/users/${deleteModal.id}`, {
+      await apiRequest(`/admin/users/${deleteDialog.id}`, {
         method: 'DELETE',
       });
-      setActionFeedback({ type: 'success', text: `User ${deleteModal.email} hard-deleted.` });
-      setDeleteModal(null);
+      setActionFeedback({
+        type: 'success',
+        text: `User ${deleteDialog.email} hard-deleted permanently.`,
+      });
+      setDeleteDialog(null);
       fetchUsers();
     } catch (err: any) {
-      setActionFeedback({ type: 'error', text: err.message || 'Deletion failed.' });
+      setActionFeedback({ type: 'error', text: err.message || 'Hard delete failed.' });
+    } finally {
+      setActionLoading(false);
     }
   };
 
   const viewUserDossier = async (userId: string) => {
     try {
       const detail = await apiRequest(`/admin/users/${userId}`);
-      setSelectedUser(detail);
-      setUserModal(true);
+      setDetailUser(detail);
     } catch (err: any) {
-      alert(err.message || 'Failed to load user details.');
+      setActionFeedback({ type: 'error', text: err.message || 'Failed to load user details.' });
     }
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-      {/* Header */}
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="space-y-6 text-left">
+      {/* Title */}
+      <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-4 pb-4 border-b border-rule">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">User Management</h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Manage user lifecycle, inspect onboarding dossiers, update statuses, or execute hard deletes.
+          <h1 className="font-serif text-[32px] leading-[38px] font-medium text-ink">
+            Users
+          </h1>
+          <p className="text-[13px] text-ink-soft mt-1">
+            Directory of account holders and system administrators.
           </p>
         </div>
-        <div className="text-xs font-semibold px-3 py-1.5 bg-slate-100 text-slate-700 rounded-xl">
-          Total Users: {total}
+        <div className="text-xs font-mono text-ink-soft">
+          Total Users: <span className="font-bold text-ink">{total}</span>
         </div>
       </div>
 
       {actionFeedback && (
-        <div
-          className={`p-4 rounded-xl flex items-center space-x-2 text-sm ${
-            actionFeedback.type === 'success'
-              ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-              : 'bg-rose-50 text-rose-800 border border-rose-200'
-          }`}
-        >
-          {actionFeedback.type === 'success' ? (
-            <CheckCircle className="w-5 h-5 flex-shrink-0 text-emerald-600" />
-          ) : (
-            <AlertCircle className="w-5 h-5 flex-shrink-0 text-rose-600" />
-          )}
-          <span>{actionFeedback.text}</span>
-        </div>
+        <Banner
+          type={actionFeedback.type}
+          message={actionFeedback.text}
+          onClose={() => setActionFeedback(null)}
+        />
       )}
 
-      {/* Filter & Search Bar */}
-      <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col sm:flex-row gap-3">
-        <form onSubmit={handleSearchSubmit} className="flex-1 relative">
-          <Search className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name or email..."
-            className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-          />
-        </form>
-
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-3.5 py-2 border border-slate-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-        >
-          <option value="">All Statuses</option>
-          <option value="ACTIVE">ACTIVE</option>
-          <option value="SUSPENDED">SUSPENDED</option>
-          <option value="CLOSED">CLOSED</option>
-        </select>
-
+      {/* Underline Tabs (§7.6 & §6) */}
+      <div className="border-b border-rule flex items-center gap-6 text-sm font-sans select-none">
         <button
-          onClick={fetchUsers}
-          className="px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-semibold hover:bg-slate-800 transition"
+          type="button"
+          onClick={() => setActiveTab('ALL')}
+          className={`pb-2.5 font-medium transition-colors ${
+            activeTab === 'ALL'
+              ? 'border-b-2 border-b-green font-semibold text-ink'
+              : 'text-ink-soft hover:text-ink'
+          }`}
         >
-          Search
+          All Users
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('HOLDERS')}
+          className={`pb-2.5 font-medium transition-colors ${
+            activeTab === 'HOLDERS'
+              ? 'border-b-2 border-b-green font-semibold text-ink'
+              : 'text-ink-soft hover:text-ink'
+          }`}
+        >
+          Account Holders
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('ADMINS')}
+          className={`pb-2.5 font-medium transition-colors ${
+            activeTab === 'ADMINS'
+              ? 'border-b-2 border-b-green font-semibold text-ink'
+              : 'text-ink-soft hover:text-ink'
+          }`}
+        >
+          Administrators
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('SUSPENDED')}
+          className={`pb-2.5 font-medium transition-colors ${
+            activeTab === 'SUSPENDED'
+              ? 'border-b-2 border-b-green font-semibold text-ink'
+              : 'text-ink-soft hover:text-ink'
+          }`}
+        >
+          Suspended
         </button>
       </div>
 
-      {/* Users Table */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        {loading ? (
-          <div className="py-12 text-center">
-            <div className="w-8 h-8 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-            <p className="text-slate-500 text-sm">Loading users...</p>
-          </div>
-        ) : users.length === 0 ? (
-          <div className="p-8 text-center text-slate-500 text-sm">No users found.</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 text-slate-500 uppercase text-xs border-b border-slate-100 font-semibold tracking-wider">
-                <tr>
-                  <th className="px-6 py-3.5">User</th>
-                  <th className="px-6 py-3.5">Role</th>
-                  <th className="px-6 py-3.5">Onboarding</th>
-                  <th className="px-6 py-3.5">Account Status</th>
-                  <th className="px-6 py-3.5 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-xs">
-                {users.map((u) => (
-                  <tr key={u.id} className="hover:bg-slate-50/80 transition">
-                    <td className="px-6 py-4">
-                      <div className="font-bold text-slate-900 text-sm">{u.fullName}</div>
-                      <div className="text-slate-500 font-mono">{u.email}</div>
+      {/* Search Bar */}
+      <form onSubmit={handleSearchSubmit} className="p-3 bg-paper-raised border border-rule flex items-center gap-3 text-sm">
+        <label htmlFor="user-search" className="text-xs font-mono uppercase text-ink-soft select-none">
+          Search
+        </label>
+        <input
+          id="user-search"
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Filter by name or email…"
+          className="h-8 px-2.5 bg-paper text-xs font-mono border border-rule rounded-[2px] focus:outline-none focus:border-green flex-1 max-w-sm"
+        />
+        <Button type="submit" variant="secondary" className="h-8 text-xs px-3">
+          Filter
+        </Button>
+      </form>
+
+      {/* Dense Ledger-Style Table (2px top rule, 1px bottom rule per §6 & §7.6) */}
+      <div className="w-full overflow-x-auto border-t-2 border-t-rule-strong border-b border-b-rule">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="bg-paper-sunk border-b border-rule">
+              <th
+                scope="col"
+                className="py-2.5 px-4 text-[11.5px] font-mono uppercase tracking-[0.06em] font-semibold text-ink-soft select-none"
+              >
+                Name
+              </th>
+              <th
+                scope="col"
+                className="py-2.5 px-4 text-[11.5px] font-mono uppercase tracking-[0.06em] font-semibold text-ink-soft select-none"
+              >
+                Email
+              </th>
+              <th
+                scope="col"
+                className="py-2.5 px-4 text-[11.5px] font-mono uppercase tracking-[0.06em] font-semibold text-ink-soft select-none"
+              >
+                Role
+              </th>
+              <th
+                scope="col"
+                className="py-2.5 px-4 text-[11.5px] font-mono uppercase tracking-[0.06em] font-semibold text-ink-soft select-none"
+              >
+                Status
+              </th>
+              <th
+                scope="col"
+                className="py-2.5 px-4 text-[11.5px] font-mono uppercase tracking-[0.06em] font-semibold text-ink-soft select-none"
+              >
+                Created (UTC)
+              </th>
+              <th
+                scope="col"
+                className="py-2.5 px-4 text-[11.5px] font-mono uppercase tracking-[0.06em] font-semibold text-ink-soft text-right select-none"
+              >
+                Actions
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-rule text-[14px]">
+            {loading ? (
+              <tr>
+                <td colSpan={6} className="py-12 text-center text-ink-soft font-mono text-xs">
+                  Loading users directory…
+                </td>
+              </tr>
+            ) : users.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="py-12 text-center text-ink-soft">
+                  <p className="font-serif text-lg text-ink mb-1">No users found.</p>
+                  <p className="text-xs text-ink-faint">Try adjusting your filter search criteria.</p>
+                </td>
+              </tr>
+            ) : (
+              users.map((u) => {
+                const isSuspended = u.status === 'SUSPENDED';
+                return (
+                  <tr key={u.id} className="h-11 hover:bg-paper-sunk/60 transition-colors">
+                    <td className="py-2.5 px-4 font-semibold text-ink">
+                      {u.fullName}
                     </td>
-                    <td className="px-6 py-4">
-                      <span
-                        className={`px-2 py-0.5 rounded text-[11px] font-bold tracking-wider uppercase ${
-                          u.role === 'ADMIN'
-                            ? 'bg-purple-100 text-purple-800'
-                            : 'bg-slate-100 text-slate-700'
-                        }`}
-                      >
-                        {u.role}
-                      </span>
+                    <td className="py-2.5 px-4 font-mono text-xs text-ink-soft">
+                      {u.email}
                     </td>
-                    <td className="px-6 py-4">
-                      <span
-                        className={`px-2 py-0.5 rounded text-[11px] font-bold tracking-wider uppercase ${
-                          u.onboarding?.status === 'APPROVED'
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : u.onboarding?.status === 'SUBMITTED'
-                            ? 'bg-blue-100 text-blue-800'
-                            : u.onboarding?.status === 'REJECTED'
-                            ? 'bg-rose-100 text-rose-800'
-                            : 'bg-slate-100 text-slate-600'
-                        }`}
-                      >
-                        {u.onboarding?.status || 'NO DATA'}
-                      </span>
+                    <td className="py-2.5 px-4">
+                      <Badge variant={u.role === 'ADMIN' ? 'slate-blue' : 'neutral'}>
+                        {u.role === 'ADMIN' ? 'ADMIN' : 'HOLDER'}
+                      </Badge>
                     </td>
-                    <td className="px-6 py-4">
-                      <select
-                        value={u.status}
-                        onChange={(e) => handleStatusChange(u.id, e.target.value)}
-                        className="px-2 py-1 text-xs border border-slate-300 rounded-lg bg-white font-semibold"
-                      >
-                        <option value="ACTIVE">ACTIVE</option>
-                        <option value="SUSPENDED">SUSPENDED</option>
-                        <option value="CLOSED">CLOSED</option>
-                      </select>
+                    <td className="py-2.5 px-4">
+                      <Badge variant={u.status === 'ACTIVE' ? 'green' : 'oxblood'}>
+                        {u.status}
+                      </Badge>
                     </td>
-                    <td className="px-6 py-4 text-right space-x-2">
-                      <button
-                        onClick={() => viewUserDossier(u.id)}
-                        className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-semibold transition"
-                      >
-                        Dossier
-                      </button>
-                      <button
-                        onClick={() => setDeleteModal(u)}
-                        className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition"
-                        title="Hard Delete User"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                    <td className="py-2.5 px-4 font-mono text-xs text-ink-soft whitespace-nowrap">
+                      {new Date(u.createdAt).toISOString().split('T')[0]}
+                    </td>
+                    <td className="py-2.5 px-4 text-right whitespace-nowrap">
+                      <div className="inline-flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => viewUserDossier(u.id)}
+                          className="text-xs font-semibold text-green hover:underline select-none"
+                        >
+                          View
+                        </button>
+                        <span className="text-rule text-xs select-none">|</span>
+                        {isSuspended ? (
+                          <button
+                            type="button"
+                            onClick={() => openStatusChange(u, 'ACTIVE')}
+                            className="text-xs font-semibold text-ink hover:underline select-none"
+                          >
+                            Activate
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => openStatusChange(u, 'SUSPENDED')}
+                            className="text-xs font-semibold text-oxblood hover:underline select-none"
+                          >
+                            Suspend
+                          </button>
+                        )}
+                        <span className="text-rule text-xs select-none">|</span>
+                        <button
+                          type="button"
+                          onClick={() => setDeleteDialog(u)}
+                          className="text-xs font-semibold text-oxblood hover:underline select-none"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                );
+              })
+            )}
+          </tbody>
+        </table>
       </div>
 
-      {/* User Dossier Modal */}
-      {userModal && selectedUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <h3 className="font-bold text-lg text-slate-900">User Dossier & Profile</h3>
-              <button onClick={() => setUserModal(false)} className="text-slate-400 hover:text-slate-600">
-                <X className="w-5 h-5" />
-              </button>
+      {/* User Detail View: Two-column layout per spec §7.6 */}
+      {detailUser && (
+        <div className="p-6 bg-paper-raised border border-rule rounded-[2px] space-y-6">
+          <div className="flex items-center justify-between pb-3 border-b border-rule">
+            <div>
+              <span className="text-xs font-mono uppercase text-ink-soft">User Dossier</span>
+              <h2 className="font-serif text-2xl font-medium text-ink">
+                {detailUser.fullName}
+              </h2>
+            </div>
+            <Button variant="secondary" onClick={() => setDetailUser(null)}>
+              Close Dossier
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
+            {/* Left: Ruled Definition List */}
+            <div className="md:col-span-6 space-y-3">
+              <span className="text-[11.5px] font-mono uppercase text-ink-soft font-semibold block">
+                Account Attributes
+              </span>
+              <DefinitionList
+                items={[
+                  { label: 'User ID', value: detailUser.id, isMono: true },
+                  { label: 'Email', value: detailUser.email, isMono: true },
+                  { label: 'System Role', value: detailUser.role, isMono: true },
+                  { label: 'Account Status', value: detailUser.status, isMono: true },
+                  { label: 'Onboarding Status', value: detailUser.onboarding?.status || 'NONE', isMono: true },
+                  { label: 'Accounts Count', value: detailUser.accounts?.length || 0, isMono: true },
+                ]}
+              />
             </div>
 
-            <div className="mt-4 space-y-4 text-sm">
-              <div className="grid grid-cols-2 gap-4 p-4 bg-slate-50 rounded-xl">
-                <div>
-                  <span className="text-xs text-slate-400 font-semibold uppercase">Full Name</span>
-                  <p className="font-bold text-slate-800">{selectedUser.fullName}</p>
-                </div>
-                <div>
-                  <span className="text-xs text-slate-400 font-semibold uppercase">Email</span>
-                  <p className="font-mono text-slate-800">{selectedUser.email}</p>
-                </div>
-                <div>
-                  <span className="text-xs text-slate-400 font-semibold uppercase">Role</span>
-                  <p className="font-bold text-slate-800">{selectedUser.role}</p>
-                </div>
-                <div>
-                  <span className="text-xs text-slate-400 font-semibold uppercase">User Status</span>
-                  <p className="font-bold text-emerald-600">{selectedUser.status}</p>
-                </div>
+            {/* Right: Recent Activity Mini Audit Table */}
+            <div className="md:col-span-6 space-y-3">
+              <span className="text-[11.5px] font-mono uppercase text-ink-soft font-semibold block">
+                Recent Activity Trail
+              </span>
+              <div className="border border-rule rounded-[2px] overflow-hidden">
+                <table className="w-full text-left text-xs font-mono">
+                  <thead className="bg-paper-sunk border-b border-rule text-ink-soft uppercase text-[10.5px]">
+                    <tr>
+                      <th className="py-2 px-3">Date</th>
+                      <th className="py-2 px-3">Action</th>
+                      <th className="py-2 px-3">IP</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-rule bg-paper">
+                    {(!detailUser.auditLogs || detailUser.auditLogs.length === 0) ? (
+                      <tr>
+                        <td colSpan={3} className="py-4 text-center text-ink-faint">
+                          No audit entries recorded.
+                        </td>
+                      </tr>
+                    ) : (
+                      detailUser.auditLogs.slice(0, 5).map((log: any) => (
+                        <tr key={log.id} className="h-8">
+                          <td className="py-1.5 px-3 text-ink-soft whitespace-nowrap">
+                            {new Date(log.createdAt).toISOString().split('T')[0]}
+                          </td>
+                          <td className="py-1.5 px-3 font-semibold text-ink">
+                            {log.action}
+                          </td>
+                          <td className="py-1.5 px-3 text-ink-faint">
+                            {log.ip || '127.0.0.1'}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
               </div>
-
-              {selectedUser.onboarding && (
-                <div className="p-4 border border-slate-200 rounded-xl space-y-2">
-                  <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider">
-                    Onboarding Verification Data ({selectedUser.onboarding.status})
-                  </h4>
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div>Address: {selectedUser.onboarding.streetAddress}, {selectedUser.onboarding.city}, {selectedUser.onboarding.country}</div>
-                    <div>Phone: {selectedUser.onboarding.phoneNumber || 'N/A'}</div>
-                    <div>ID: {selectedUser.onboarding.idType} - {selectedUser.onboarding.idNumber}</div>
-                    <div>Occupation: {selectedUser.onboarding.occupation || 'N/A'}</div>
-                    <div>Source of Funds: {selectedUser.onboarding.sourceOfFunds || 'N/A'}</div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="mt-6 flex justify-end">
-              <button
-                onClick={() => setUserModal(false)}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition"
-              >
-                Close
-              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
-      {deleteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
-            <div className="flex items-center space-x-3 text-rose-600 mb-3">
-              <ShieldAlert className="w-6 h-6" />
-              <h3 className="font-bold text-lg text-slate-900">Confirm Hard Delete</h3>
-            </div>
-            <p className="text-sm text-slate-600">
-              Are you sure you want to permanently delete user <span className="font-bold text-slate-900">{deleteModal.email}</span>?
-            </p>
-            <p className="text-xs text-rose-700 bg-rose-50 p-3 rounded-xl mt-3 font-medium">
-              Note: Hard deletes permanently remove the record and all associated onboarding and empty accounts from the database. Non-zero balance accounts cannot be deleted.
-            </p>
-            <div className="mt-6 flex justify-end gap-2">
-              <button
-                onClick={() => setDeleteModal(null)}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleConfirmDelete}
-                className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-semibold transition"
-              >
-                Permanently Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Suspend / Activate Confirm Dialog (§6 & §7.6) */}
+      <Dialog
+        isOpen={statusDialog !== null}
+        onClose={() => setStatusDialog(null)}
+        title={statusDialog?.newStatus === 'SUSPENDED' ? 'Confirm User Suspension' : 'Confirm User Activation'}
+        confirmLabel={statusDialog?.newStatus === 'SUSPENDED' ? 'Suspend User' : 'Activate User'}
+        confirmVariant={statusDialog?.newStatus === 'SUSPENDED' ? 'destructive' : 'primary'}
+        onConfirm={confirmStatusChange}
+        loading={actionLoading}
+      >
+        <p>
+          Are you sure you want to change the status of user{' '}
+          <strong className="font-mono text-ink font-semibold">
+            {statusDialog?.user.email}
+          </strong>{' '}
+          to <strong className="font-mono">{statusDialog?.newStatus}</strong>?
+        </p>
+        {statusDialog?.newStatus === 'SUSPENDED' && (
+          <p className="mt-2 text-xs text-oxblood font-semibold">
+            Warning: Suspended users are immediately blocked from logging in and executing ledger transactions.
+          </p>
+        )}
+      </Dialog>
+
+      {/* Delete User Confirm Dialog (§6 & §7.6 - restates email in mono) */}
+      <Dialog
+        isOpen={deleteDialog !== null}
+        onClose={() => setDeleteDialog(null)}
+        title="Confirm Hard Deletion"
+        confirmLabel="Hard Delete User"
+        confirmVariant="destructive"
+        onConfirm={confirmDelete}
+        loading={actionLoading}
+      >
+        <p>
+          Are you sure you want to permanently delete user{' '}
+          <strong className="font-mono text-ink font-bold">
+            {deleteDialog?.email}
+          </strong>
+          ?
+        </p>
+        <p className="mt-2 text-xs text-ink-soft">
+          Per PRD requirements, hard deletion permanently removes the user and associated records. Deletion is rejected by the system if the user holds an account with non-zero balance.
+        </p>
+      </Dialog>
     </div>
   );
 };
-

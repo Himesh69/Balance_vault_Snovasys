@@ -1,22 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { apiRequest } from '../../lib/api.js';
-import {
-  UserCheck,
-  CheckCircle,
-  XCircle,
-  AlertCircle,
-  Clock,
-  Eye,
-  X
-} from 'lucide-react';
+import { Badge } from '../../components/ui/Badge.js';
+import { Button } from '../../components/ui/Button.js';
+import { Banner } from '../../components/ui/Banner.js';
+import { DefinitionList } from '../../components/ui/DefinitionList.js';
+import { Panel } from '../../components/ui/Panel.js';
 
 export const AdminOnboarding: React.FC = () => {
   const [onboardings, setOnboardings] = useState<any[]>([]);
   const [statusFilter, setStatusFilter] = useState('SUBMITTED');
   const [loading, setLoading] = useState(true);
-  const [inspectModal, setInspectModal] = useState<any>(null);
-  const [rejectModal, setRejectModal] = useState<any>(null);
+
+  // Selected dossier for inline / detail review view (§7.7)
+  const [selectedRecord, setSelectedRecord] = useState<any | null>(null);
   const [reviewNotes, setReviewNotes] = useState('');
+  const [rejecting, setRejecting] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -39,38 +37,48 @@ export const AdminOnboarding: React.FC = () => {
 
   const handleApprove = async (onboardingId: string) => {
     setFeedback(null);
+    setSubmitting(true);
     try {
       await apiRequest(`/admin/onboarding/${onboardingId}/approve`, {
         method: 'POST',
-        body: JSON.stringify({ reviewNotes: 'Approved by administrator' }),
+        body: JSON.stringify({ reviewNotes: reviewNotes.trim() || 'Approved by administrator' }),
       });
       setFeedback({
         type: 'success',
-        text: 'Application APPROVED! Primary account successfully provisioned for user.',
+        text: 'Application APPROVED. Primary user account provisioned successfully.',
       });
-      setInspectModal(null);
+      setSelectedRecord(null);
+      setReviewNotes('');
       fetchQueue();
     } catch (err: any) {
       setFeedback({ type: 'error', text: err.message || 'Approval failed.' });
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const handleReject = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!rejectModal) return;
+    if (!selectedRecord) return;
+
+    if (!reviewNotes.trim()) {
+      setFeedback({ type: 'error', text: 'A rejection reason is required per audit protocol.' });
+      return;
+    }
+
     setSubmitting(true);
     setFeedback(null);
     try {
-      await apiRequest(`/admin/onboarding/${rejectModal.id}/reject`, {
+      await apiRequest(`/admin/onboarding/${selectedRecord.id}/reject`, {
         method: 'POST',
-        body: JSON.stringify({ reviewNotes: reviewNotes.trim() || 'Requirements not met' }),
+        body: JSON.stringify({ reviewNotes: reviewNotes.trim() }),
       });
       setFeedback({
         type: 'success',
-        text: 'Application REJECTED. User has been requested to revise and re-submit.',
+        text: 'Application REJECTED. Applicant requested to revise and resubmit.',
       });
-      setRejectModal(null);
-      setInspectModal(null);
+      setSelectedRecord(null);
+      setRejecting(false);
       setReviewNotes('');
       fetchQueue();
     } catch (err: any) {
@@ -81,254 +89,335 @@ export const AdminOnboarding: React.FC = () => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-      {/* Header */}
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="space-y-6 text-left">
+      {/* Title */}
+      <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-4 pb-4 border-b border-rule">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Onboarding Review Queue</h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Review identity submissions, inspect proof of identity, approve accounts or request changes.
+          <h1 className="font-serif text-[32px] leading-[38px] font-medium text-ink">
+            Onboarding Queue
+          </h1>
+          <p className="text-[13px] text-ink-soft mt-1">
+            Review applicant regulatory dossiers, evaluate credentials, approve or reject applications.
           </p>
-        </div>
-
-        {/* Status Filters */}
-        <div className="flex bg-slate-100 p-1 rounded-xl text-xs font-semibold">
-          {['SUBMITTED', 'APPROVED', 'REJECTED', ''].map((st) => (
-            <button
-              key={st}
-              onClick={() => setStatusFilter(st)}
-              className={`px-3 py-1.5 rounded-lg transition ${
-                statusFilter === st ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              {st || 'ALL'}
-            </button>
-          ))}
         </div>
       </div>
 
       {feedback && (
-        <div
-          className={`p-4 rounded-xl flex items-center space-x-2 text-sm ${
-            feedback.type === 'success'
-              ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-              : 'bg-rose-50 text-rose-800 border border-rose-200'
+        <Banner
+          type={feedback.type}
+          message={feedback.text}
+          onClose={() => setFeedback(null)}
+        />
+      )}
+
+      {/* Underline Tabs (§7.7 & §6) */}
+      <div className="border-b border-rule flex items-center gap-6 text-sm font-sans select-none">
+        <button
+          type="button"
+          onClick={() => {
+            setStatusFilter('SUBMITTED');
+            setSelectedRecord(null);
+          }}
+          className={`pb-2.5 font-medium transition-colors ${
+            statusFilter === 'SUBMITTED'
+              ? 'border-b-2 border-b-green font-semibold text-ink'
+              : 'text-ink-soft hover:text-ink'
           }`}
         >
-          {feedback.type === 'success' ? (
-            <CheckCircle className="w-5 h-5 flex-shrink-0 text-emerald-600" />
-          ) : (
-            <AlertCircle className="w-5 h-5 flex-shrink-0 text-rose-600" />
-          )}
-          <span>{feedback.text}</span>
-        </div>
-      )}
-
-      {/* Applications List */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        {loading ? (
-          <div className="py-12 text-center">
-            <div className="w-8 h-8 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-            <p className="text-slate-500 text-sm">Loading applications...</p>
-          </div>
-        ) : onboardings.length === 0 ? (
-          <div className="p-12 text-center text-slate-500 text-sm">
-            No applications matching filter ({statusFilter || 'ALL'}).
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 text-slate-500 uppercase text-xs border-b border-slate-100 font-semibold tracking-wider">
-                <tr>
-                  <th className="px-6 py-3.5">Applicant</th>
-                  <th className="px-6 py-3.5">ID Info</th>
-                  <th className="px-6 py-3.5">Status</th>
-                  <th className="px-6 py-3.5">Submitted At</th>
-                  <th className="px-6 py-3.5 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-xs">
-                {onboardings.map((item) => (
-                  <tr key={item.id} className="hover:bg-slate-50/80 transition">
-                    <td className="px-6 py-4">
-                      <div className="font-bold text-slate-900 text-sm">
-                        {item.legalName || item.user?.fullName}
-                      </div>
-                      <div className="text-slate-500 font-mono">{item.user?.email}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="font-medium text-slate-800">{item.idType || '—'}</div>
-                      <div className="text-slate-400 font-mono">{item.idNumber || '—'}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span
-                        className={`px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wider uppercase ${
-                          item.status === 'APPROVED'
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : item.status === 'SUBMITTED'
-                            ? 'bg-blue-100 text-blue-800 animate-pulse'
-                            : item.status === 'REJECTED'
-                            ? 'bg-rose-100 text-rose-800'
-                            : 'bg-slate-100 text-slate-700'
-                        }`}
-                      >
-                        {item.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-slate-500">
-                      {item.submittedAt ? new Date(item.submittedAt).toLocaleString() : 'Not submitted'}
-                    </td>
-                    <td className="px-6 py-4 text-right space-x-2">
-                      <button
-                        onClick={() => setInspectModal(item)}
-                        className="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-semibold transition"
-                      >
-                        Inspect Dossier
-                      </button>
-
-                      {item.status === 'SUBMITTED' && (
-                        <>
-                          <button
-                            onClick={() => handleApprove(item.id)}
-                            className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-semibold transition"
-                          >
-                            Approve
-                          </button>
-                          <button
-                            onClick={() => setRejectModal(item)}
-                            className="px-3 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded-lg font-semibold transition"
-                          >
-                            Reject
-                          </button>
-                        </>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+          Pending Review
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setStatusFilter('APPROVED');
+            setSelectedRecord(null);
+          }}
+          className={`pb-2.5 font-medium transition-colors ${
+            statusFilter === 'APPROVED'
+              ? 'border-b-2 border-b-green font-semibold text-ink'
+              : 'text-ink-soft hover:text-ink'
+          }`}
+        >
+          Approved
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setStatusFilter('REJECTED');
+            setSelectedRecord(null);
+          }}
+          className={`pb-2.5 font-medium transition-colors ${
+            statusFilter === 'REJECTED'
+              ? 'border-b-2 border-b-green font-semibold text-ink'
+              : 'text-ink-soft hover:text-ink'
+          }`}
+        >
+          Rejected
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setStatusFilter('');
+            setSelectedRecord(null);
+          }}
+          className={`pb-2.5 font-medium transition-colors ${
+            statusFilter === ''
+              ? 'border-b-2 border-b-green font-semibold text-ink'
+              : 'text-ink-soft hover:text-ink'
+          }`}
+        >
+          All Dossiers
+        </button>
       </div>
 
-      {/* Inspect Dossier Modal */}
-      {inspectModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <h3 className="font-bold text-lg text-slate-900">
-                Application Dossier: {inspectModal.legalName || inspectModal.user?.fullName}
-              </h3>
-              <button onClick={() => setInspectModal(null)} className="text-slate-400 hover:text-slate-600">
-                <X className="w-5 h-5" />
-              </button>
+      {/* Detail Review View (if selected record exists per spec §7.7) */}
+      {selectedRecord ? (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between pb-3 border-b border-rule">
+            <div>
+              <span className="text-xs font-mono uppercase text-ink-soft">
+                Application Review
+              </span>
+              <h2 className="font-serif text-2xl font-medium text-ink flex items-center gap-3">
+                <span>{selectedRecord.legalName || selectedRecord.user?.fullName}</span>
+                <Badge variant={selectedRecord.status === 'APPROVED' ? 'green' : selectedRecord.status === 'REJECTED' ? 'oxblood' : 'brass'}>
+                  {selectedRecord.status}
+                </Badge>
+              </h2>
+            </div>
+            <Button variant="secondary" onClick={() => setSelectedRecord(null)}>
+              ← Back to Queue
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
+            {/* Left column: submitted data as a ruled definition list (§7.7) */}
+            <div className="md:col-span-7">
+              <Panel hasDocumentHeader title="Applicant Dossier">
+                <DefinitionList
+                  items={[
+                    { label: 'Reference ID', value: selectedRecord.id, isMono: true },
+                    { label: 'Applicant User ID', value: selectedRecord.userId, isMono: true },
+                    { label: 'Registered Email', value: selectedRecord.user?.email, isMono: true },
+                    { label: 'Legal Full Name', value: selectedRecord.legalName },
+                    { label: 'Date of Birth', value: selectedRecord.dateOfBirth, isMono: true },
+                    { label: 'Phone Number', value: selectedRecord.phoneNumber, isMono: true },
+                    { label: 'Residential Address', value: `${selectedRecord.streetAddress || ''}, ${selectedRecord.city || ''}, ${selectedRecord.country || ''}` },
+                    { label: 'Identification Type', value: selectedRecord.idType, isMono: true },
+                    { label: 'Identification Number', value: selectedRecord.idNumber, isMono: true },
+                    { label: 'Occupation', value: selectedRecord.occupation },
+                    { label: 'Source of Funds', value: selectedRecord.sourceOfFunds },
+                    { label: 'Submission Timestamp', value: selectedRecord.submittedAt ? new Date(selectedRecord.submittedAt).toISOString().replace('T', ' ').substring(0, 19) : '—', isMono: true },
+                  ]}
+                />
+              </Panel>
             </div>
 
-            <div className="mt-4 space-y-4 text-xs">
-              <div className="grid grid-cols-2 gap-3 p-4 bg-slate-50 rounded-xl">
-                <div><span className="font-semibold text-slate-400 uppercase">Legal Name:</span> <span className="font-bold text-slate-900">{inspectModal.legalName}</span></div>
-                <div><span className="font-semibold text-slate-400 uppercase">DOB:</span> <span className="font-bold text-slate-900">{inspectModal.dateOfBirth}</span></div>
-                <div><span className="font-semibold text-slate-400 uppercase">Phone:</span> <span className="font-bold text-slate-900">{inspectModal.phoneNumber}</span></div>
-                <div><span className="font-semibold text-slate-400 uppercase">Email:</span> <span className="font-mono text-slate-900">{inspectModal.user?.email}</span></div>
-              </div>
+            {/* Right column: Decision Panel & Mini Timeline (§7.7) */}
+            <div className="md:col-span-5 space-y-6">
+              {/* Decision Panel */}
+              {selectedRecord.status === 'SUBMITTED' ? (
+                <Panel hasDocumentHeader title="Adjudication">
+                  <p className="text-xs text-ink-soft mb-4">
+                    Approve to automatically provision the user's primary clearing account, or reject with a documented rationale.
+                  </p>
 
-              <div className="p-4 border border-slate-200 rounded-xl space-y-2">
-                <div className="font-bold text-slate-900 uppercase">Address & Location</div>
-                <div>Street: {inspectModal.streetAddress}</div>
-                <div>City/State/Zip: {inspectModal.city}, {inspectModal.state} {inspectModal.postalCode}</div>
-                <div>Country: {inspectModal.country}</div>
-              </div>
+                  <div className="space-y-3 mb-5">
+                    <label className="block text-[13px] font-semibold text-ink select-none">
+                      Decision Notes (Required for rejection)
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={reviewNotes}
+                      onChange={(e) => setReviewNotes(e.target.value)}
+                      placeholder="e.g. Identity documents verified against official registry…"
+                      className="w-full p-2.5 bg-paper text-sm border border-rule rounded-[2px] focus:outline-none focus:border-green font-sans"
+                    />
+                  </div>
 
-              <div className="p-4 border border-slate-200 rounded-xl space-y-2">
-                <div className="font-bold text-slate-900 uppercase">Identity & Source of Funds</div>
-                <div>ID Type: {inspectModal.idType} • Number: <span className="font-mono font-bold">{inspectModal.idNumber}</span></div>
-                <div>Occupation: {inspectModal.occupation}</div>
-                <div>Source of Funds: {inspectModal.sourceOfFunds}</div>
-              </div>
+                  <div className="flex items-center justify-between gap-3 pt-3 border-t border-rule">
+                    <Button
+                      type="button"
+                      variant="destructive-outline"
+                      onClick={handleReject}
+                      loading={submitting}
+                    >
+                      Reject Application
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="primary"
+                      onClick={() => handleApprove(selectedRecord.id)}
+                      loading={submitting}
+                    >
+                      Approve Dossier
+                    </Button>
+                  </div>
+                </Panel>
+              ) : (
+                <Panel hasDocumentHeader title="Adjudication Record">
+                  <div className="space-y-3 text-sm">
+                    <div>
+                      <span className="text-xs font-mono uppercase text-ink-soft block">
+                        Final Decision
+                      </span>
+                      <Badge variant={selectedRecord.status === 'APPROVED' ? 'green' : 'oxblood'}>
+                        {selectedRecord.status}
+                      </Badge>
+                    </div>
+                    <div>
+                      <span className="text-xs font-mono uppercase text-ink-soft block">
+                        Reviewer Rationale
+                      </span>
+                      <p className="text-ink mt-0.5 italic">
+                        "{selectedRecord.reviewNotes || 'No notes recorded.'}"
+                      </p>
+                    </div>
+                  </div>
+                </Panel>
+              )}
 
-              {inspectModal.reviewNotes && (
-                <div className="p-3 bg-amber-50 text-amber-900 rounded-xl">
-                  <span className="font-bold">Prior Reviewer Notes:</span> {inspectModal.reviewNotes}
+              {/* Mini Decision Timeline (§7.7 - vertical 1px rule with square markers) */}
+              <div className="p-4 bg-paper-raised border border-rule rounded-[2px]">
+                <span className="text-[11.5px] font-mono uppercase text-ink-soft font-semibold block mb-3">
+                  Decision Audit Timeline
+                </span>
+                <div className="border-l border-rule ml-2 pl-4 space-y-4 text-xs font-mono text-ink">
+                  <div className="relative">
+                    <div className="absolute -left-[21px] top-1 w-2.5 h-2.5 bg-green border border-rule-strong select-none" />
+                    <span className="text-ink-soft block text-[11px]">
+                      {selectedRecord.createdAt ? new Date(selectedRecord.createdAt).toISOString().split('T')[0] : '—'}
+                    </span>
+                    <span className="font-semibold">Dossier Created</span>
+                  </div>
+
+                  {selectedRecord.submittedAt && (
+                    <div className="relative">
+                      <div className="absolute -left-[21px] top-1 w-2.5 h-2.5 bg-brass border border-rule-strong select-none" />
+                      <span className="text-ink-soft block text-[11px]">
+                        {new Date(selectedRecord.submittedAt).toISOString().split('T')[0]}
+                      </span>
+                      <span className="font-semibold">Submitted by Applicant</span>
+                    </div>
+                  )}
+
+                  {selectedRecord.reviewedAt && (
+                    <div className="relative">
+                      <div className="absolute -left-[21px] top-1 w-2.5 h-2.5 bg-ink border border-rule-strong select-none" />
+                      <span className="text-ink-soft block text-[11px]">
+                        {new Date(selectedRecord.reviewedAt).toISOString().split('T')[0]}
+                      </span>
+                      <span className="font-semibold">
+                        Adjudicated: {selectedRecord.status}
+                      </span>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-
-            <div className="mt-6 flex justify-end gap-2">
-              <button
-                onClick={() => setInspectModal(null)}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition"
-              >
-                Close
-              </button>
-
-              {inspectModal.status === 'SUBMITTED' && (
-                <>
-                  <button
-                    onClick={() => handleApprove(inspectModal.id)}
-                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold transition shadow-sm"
-                  >
-                    Approve Application
-                  </button>
-                  <button
-                    onClick={() => {
-                      setRejectModal(inspectModal);
-                    }}
-                    className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-semibold transition shadow-sm"
-                  >
-                    Reject Application
-                  </button>
-                </>
-              )}
+              </div>
             </div>
           </div>
         </div>
-      )}
-
-      {/* Reject Reason Modal */}
-      {rejectModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
-            <h3 className="font-bold text-lg text-slate-900 mb-2">Reject Onboarding Application</h3>
-            <p className="text-xs text-slate-500 mb-4">
-              Specify the reason for rejection. The applicant will be able to view this reason, correct their details, and re-submit.
-            </p>
-
-            <form onSubmit={handleReject} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">
-                  Reason / Revision Notes *
-                </label>
-                <textarea
-                  required
-                  rows={3}
-                  value={reviewNotes}
-                  onChange={(e) => setReviewNotes(e.target.value)}
-                  placeholder="e.g. Government ID number does not match format, or address is incomplete."
-                  className="w-full p-3 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-rose-500 focus:outline-none"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setRejectModal(null)}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition"
+      ) : (
+        /* Queue Table (§7.7) */
+        <div className="w-full overflow-x-auto border-t-2 border-t-rule-strong border-b border-b-rule">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-paper-sunk border-b border-rule">
+                <th
+                  scope="col"
+                  className="py-2.5 px-4 text-[11.5px] font-mono uppercase tracking-[0.06em] font-semibold text-ink-soft select-none"
                 >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-semibold transition disabled:opacity-50"
+                  Reference ID
+                </th>
+                <th
+                  scope="col"
+                  className="py-2.5 px-4 text-[11.5px] font-mono uppercase tracking-[0.06em] font-semibold text-ink-soft select-none"
                 >
-                  {submitting ? 'Rejecting...' : 'Confirm Rejection'}
-                </button>
-              </div>
-            </form>
-          </div>
+                  Applicant
+                </th>
+                <th
+                  scope="col"
+                  className="py-2.5 px-4 text-[11.5px] font-mono uppercase tracking-[0.06em] font-semibold text-ink-soft select-none"
+                >
+                  Submitted (UTC)
+                </th>
+                <th
+                  scope="col"
+                  className="py-2.5 px-4 text-[11.5px] font-mono uppercase tracking-[0.06em] font-semibold text-ink-soft select-none"
+                >
+                  Status
+                </th>
+                <th
+                  scope="col"
+                  className="py-2.5 px-4 text-[11.5px] font-mono uppercase tracking-[0.06em] font-semibold text-ink-soft text-right select-none"
+                >
+                  Action
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-rule text-[14px]">
+              {loading ? (
+                <tr>
+                  <td colSpan={5} className="py-12 text-center text-ink-soft font-mono text-xs">
+                    Loading queue dossiers…
+                  </td>
+                </tr>
+              ) : onboardings.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="py-12 text-center text-ink-soft">
+                    <p className="font-serif text-lg text-ink mb-1">
+                      No dossiers in queue matching this filter.
+                    </p>
+                    <p className="text-xs text-ink-faint">
+                      New applicant submissions will appear here for verification.
+                    </p>
+                  </td>
+                </tr>
+              ) : (
+                onboardings.map((item) => (
+                  <tr
+                    key={item.id}
+                    onClick={() => setSelectedRecord(item)}
+                    className="h-11 cursor-pointer hover:bg-paper-sunk/60 transition-colors"
+                  >
+                    <td className="py-2.5 px-4 font-mono text-xs text-ink font-semibold">
+                      {item.id.substring(0, 13)}…
+                    </td>
+                    <td className="py-2.5 px-4 text-ink">
+                      <div className="font-semibold text-sm">
+                        {item.legalName || item.user?.fullName || 'Anonymous'}
+                      </div>
+                      <div className="font-mono text-xs text-ink-soft">
+                        {item.user?.email}
+                      </div>
+                    </td>
+                    <td className="py-2.5 px-4 font-mono text-xs text-ink-soft whitespace-nowrap">
+                      {item.submittedAt ? new Date(item.submittedAt).toISOString().replace('T', ' ').substring(0, 16) : 'Draft (Not submitted)'}
+                    </td>
+                    <td className="py-2.5 px-4">
+                      <Badge variant={item.status === 'APPROVED' ? 'green' : item.status === 'REJECTED' ? 'oxblood' : 'brass'}>
+                        {item.status}
+                      </Badge>
+                    </td>
+                    <td className="py-2.5 px-4 text-right">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedRecord(item);
+                        }}
+                        className="text-xs font-semibold text-green hover:underline select-none"
+                      >
+                        Inspect Dossier →
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       )}
     </div>
   );
 };
-

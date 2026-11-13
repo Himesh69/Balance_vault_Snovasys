@@ -1,22 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.js';
-import { apiRequest, formatCurrency } from '../lib/api.js';
-import {
-  Wallet,
-  ArrowUpRight,
-  ArrowDownLeft,
-  FileText,
-  AlertTriangle,
-  CheckCircle2,
-  Clock,
-  Shield,
-  Layers
-} from 'lucide-react';
+import { apiRequest } from '../lib/api.js';
+import { Badge } from '../components/ui/Badge.js';
+import { Button } from '../components/ui/Button.js';
+import { Banner } from '../components/ui/Banner.js';
+import { DefinitionList } from '../components/ui/DefinitionList.js';
+import { MoneyCell } from '../components/ui/MoneyCell.js';
 
 export const Dashboard: React.FC = () => {
   const { user, refreshUser } = useAuth();
   const [accounts, setAccounts] = useState<any[]>([]);
+  const [recentEntries, setRecentEntries] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -25,6 +20,13 @@ export const Dashboard: React.FC = () => {
         await refreshUser();
         const accs = await apiRequest('/accounts');
         setAccounts(accs);
+
+        if (accs && accs.length > 0) {
+          // Fetch ledger for primary account
+          const primary = accs[0];
+          const ledger = await apiRequest(`/accounts/${primary.id}/ledger`);
+          setRecentEntries(ledger.slice(0, 10));
+        }
       } catch (err) {
         console.error('Error fetching dashboard data:', err);
       } finally {
@@ -34,190 +36,290 @@ export const Dashboard: React.FC = () => {
     loadData();
   }, []);
 
+  const primaryAccount = accounts[0];
   const totalBalance = accounts.reduce((sum, acc) => sum + (acc.cachedBalance || 0), 0);
   const onboardingStatus = user?.onboarding?.status || 'DRAFT';
 
+  const formattedDate = new Intl.DateTimeFormat('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZoneName: 'short',
+  }).format(new Date());
+
+  if (loading) {
+    return (
+      <div className="space-y-4 text-left">
+        <div className="h-8 w-48 bg-paper-sunk rounded-[2px] animate-pulse" />
+        <div className="h-44 w-full bg-paper-sunk rounded-[2px] animate-pulse" />
+        <div className="h-64 w-full bg-paper-sunk rounded-[2px] animate-pulse" />
+      </div>
+    );
+  }
+
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-      {/* Top Banner */}
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="space-y-8 text-left">
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-rule">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">
-            Welcome back, {user?.fullName}!
+          <h1 className="font-serif text-[32px] leading-[38px] font-medium text-ink flex items-center gap-3">
+            <span>Account</span>
+            {primaryAccount ? (
+              <span className="font-mono text-2xl text-ink font-semibold">
+                {primaryAccount.accountNumber}
+              </span>
+            ) : (
+              <span className="font-mono text-xl text-ink-soft">PENDING</span>
+            )}
+            <Badge variant={primaryAccount?.status === 'ACTIVE' ? 'green' : 'brass'}>
+              {primaryAccount?.status || onboardingStatus}
+            </Badge>
           </h1>
-          <p className="text-slate-500 text-sm mt-1">
-            Account Holder Portal • Secure Double-Entry Balance Management
+          <p className="text-[13px] text-ink-soft mt-1">
+            Holder: {user?.fullName} • Single entity double-entry ledger statement
           </p>
         </div>
-        <div className="flex items-center space-x-3">
-          <Link
-            to="/accounts"
-            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-xl text-sm transition flex items-center shadow-sm"
-          >
-            <Wallet className="w-4 h-4 mr-2" />
-            My Accounts
-          </Link>
-        </div>
-      </div>
 
-      {/* Onboarding Status Alert Card */}
-      {onboardingStatus === 'DRAFT' && (
-        <div className="bg-amber-50 border-l-4 border-amber-500 p-5 rounded-xl flex items-start space-x-4">
-          <Clock className="w-6 h-6 text-amber-600 flex-shrink-0 mt-0.5" />
-          <div className="flex-1">
-            <h3 className="font-semibold text-amber-900">Onboarding Incomplete</h3>
-            <p className="text-sm text-amber-800 mt-1">
-              Please complete and submit your onboarding verification form so our team can approve and provision your primary account.
-            </p>
-            <Link
-              to="/onboarding"
-              className="inline-block mt-3 px-4 py-1.5 bg-amber-600 text-white rounded-lg text-xs font-semibold hover:bg-amber-700 transition"
-            >
-              Continue Onboarding →
+        {primaryAccount && (
+          <div className="flex items-center gap-3">
+            <Link to="/accounts">
+              <Button variant="secondary">Manage Movements</Button>
             </Link>
           </div>
-        </div>
+        )}
+      </div>
+
+      {/* Onboarding State Notices */}
+      {onboardingStatus === 'DRAFT' && (
+        <Banner
+          type="warning"
+          title="Onboarding Incomplete"
+          message={
+            <div>
+              Verification details are required before account activation and ledger operations can commence.{' '}
+              <Link to="/onboarding" className="font-semibold underline ml-1">
+                Complete Onboarding →
+              </Link>
+            </div>
+          }
+        />
       )}
 
       {onboardingStatus === 'SUBMITTED' && (
-        <div className="bg-blue-50 border-l-4 border-blue-500 p-5 rounded-xl flex items-start space-x-4">
-          <Clock className="w-6 h-6 text-blue-600 flex-shrink-0 mt-0.5 animate-pulse" />
-          <div className="flex-1">
-            <h3 className="font-semibold text-blue-900">Verification Pending Review</h3>
-            <p className="text-sm text-blue-800 mt-1">
-              Your onboarding application has been submitted and is currently being reviewed by an administrator. You will be notified once approved.
-            </p>
-          </div>
-        </div>
+        <Banner
+          type="info"
+          title="Verification Pending Review"
+          message="Your application has been submitted and is currently queued for administrator approval. Initial clearing accounts will be provisioned upon confirmation."
+        />
       )}
 
       {onboardingStatus === 'REJECTED' && (
-        <div className="bg-rose-50 border-l-4 border-rose-500 p-5 rounded-xl flex items-start space-x-4">
-          <AlertTriangle className="w-6 h-6 text-rose-600 flex-shrink-0 mt-0.5" />
-          <div className="flex-1">
-            <h3 className="font-semibold text-rose-900">Application Needs Revision</h3>
-            <p className="text-sm text-rose-800 mt-1">
-              Reviewer Notes:{' '}
-              <span className="font-medium italic">
-                "{user?.onboarding?.reviewNotes || 'Please update your details and re-submit.'}"
-              </span>
-            </p>
-            <Link
-              to="/onboarding"
-              className="inline-block mt-3 px-4 py-1.5 bg-rose-600 text-white rounded-lg text-xs font-semibold hover:bg-rose-700 transition"
-            >
-              Edit & Re-submit Application →
-            </Link>
-          </div>
-        </div>
+        <Banner
+          type="error"
+          title="Application Needs Revision"
+          message={
+            <div>
+              Review notes: "{user?.onboarding?.reviewNotes || 'Please update your details and re-submit.'}"{' '}
+              <Link to="/onboarding" className="font-semibold underline ml-1">
+                Edit & Resubmit Application →
+              </Link>
+            </div>
+          }
+        />
       )}
 
-      {onboardingStatus === 'APPROVED' && (
-        <div className="bg-emerald-50 border-l-4 border-emerald-500 p-4 rounded-xl flex items-center space-x-3 text-emerald-900">
-          <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
-          <span className="text-sm font-medium">
-            Identity verified and account approved. Double-entry ledger operations are fully active.
-          </span>
-        </div>
-      )}
+      {/* Single Large Balance Statement (PRD §7.3) */}
+      <div className="bg-paper-raised border border-rule rounded-[2px] p-6 grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
+        {/* Left: 40px mono balance figure + action buttons */}
+        <div className="md:col-span-7 space-y-4">
+          <div className="text-[11.5px] font-mono uppercase tracking-[0.06em] text-ink-soft font-semibold select-none">
+            AVAILABLE BALANCE
+          </div>
 
-      {/* Metrics Row */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-          <div className="flex items-center justify-between text-slate-500 text-sm font-medium mb-2">
-            <span>Total Available Balance</span>
-            <Wallet className="w-5 h-5 text-emerald-600" />
+          <div className="font-mono text-[40px] leading-[44px] font-medium text-ink tabular-nums">
+            <MoneyCell
+              amount={totalBalance}
+              isCents={true}
+              direction="BALANCE"
+              showSign={false}
+              className="text-[40px] font-medium"
+            />
           </div>
-          <div className="text-3xl font-extrabold text-slate-900">
-            {formatCurrency(totalBalance)}
+
+          <div className="text-[13px] text-ink-soft font-sans">
+            As of {formattedDate}
           </div>
-          <p className="text-xs text-slate-400 mt-2">
-            Sum of all active account balances
-          </p>
+
+          {/* Primary Action Buttons placed directly below balance, left-aligned, not floating */}
+          {primaryAccount && (
+            <div className="pt-2 flex flex-wrap items-center gap-3">
+              <Link to="/accounts">
+                <Button variant="primary">Deposit Funds</Button>
+              </Link>
+              <Link to="/accounts">
+                <Button variant="secondary">Withdraw Funds</Button>
+              </Link>
+              <Link
+                to={`/accounts/${primaryAccount.id}/ledger`}
+                className="text-xs font-sans font-medium text-green hover:underline ml-2"
+              >
+                View full statement →
+              </Link>
+            </div>
+          )}
         </div>
 
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-          <div className="flex items-center justify-between text-slate-500 text-sm font-medium mb-2">
-            <span>Active Accounts</span>
-            <Layers className="w-5 h-5 text-blue-600" />
+        {/* Right: Dotted statement definition list (§7.3) */}
+        <div className="md:col-span-5 border-t md:border-t-0 md:border-l border-rule pt-6 md:pt-0 md:pl-8">
+          <div className="text-[11.5px] font-mono uppercase tracking-[0.06em] text-ink-soft font-semibold mb-3 select-none">
+            Statement Details
           </div>
-          <div className="text-3xl font-extrabold text-slate-900">
-            {accounts.length}
-          </div>
-          <p className="text-xs text-slate-400 mt-2">
-            Linked to your verified identity
-          </p>
-        </div>
-
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-          <div className="flex items-center justify-between text-slate-500 text-sm font-medium mb-2">
-            <span>Ledger Integrity</span>
-            <Shield className="w-5 h-5 text-purple-600" />
-          </div>
-          <div className="text-lg font-bold text-slate-800">
-            100% Balanced
-          </div>
-          <p className="text-xs text-slate-400 mt-2">
-            Every movement enforces Debit = Credit
-          </p>
+          <DefinitionList
+            items={[
+              {
+                label: 'Account Type',
+                value: primaryAccount?.accountType || 'Standard Holder',
+              },
+              {
+                label: 'Currency',
+                value: primaryAccount?.currency || 'USD',
+                isMono: true,
+              },
+              {
+                label: 'Account Identifier',
+                value: primaryAccount?.accountNumber || '—',
+                isMono: true,
+              },
+              {
+                label: 'Total Entries',
+                value: recentEntries.length,
+                isMono: true,
+              },
+              {
+                label: 'Ledger Invariant',
+                value: 'Σ(Debits) = Σ(Credits)',
+                isMono: true,
+              },
+            ]}
+          />
         </div>
       </div>
 
-      {/* Accounts List Section */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-          <h2 className="text-lg font-bold text-slate-900">Your Accounts</h2>
-          <Link to="/accounts" className="text-sm text-emerald-600 hover:text-emerald-700 font-medium">
-            Manage Accounts →
-          </Link>
+      {/* Recent Entries Ledger Table (PRD §7.3) */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="font-serif text-[22px] leading-7 font-medium text-ink">
+            Recent Entries
+          </h2>
+          {primaryAccount && (
+            <Link
+              to={`/accounts/${primaryAccount.id}/ledger`}
+              className="text-xs font-sans font-semibold text-green hover:underline"
+            >
+              View full ledger →
+            </Link>
+          )}
         </div>
 
-        {accounts.length === 0 ? (
-          <div className="p-8 text-center">
-            <Wallet className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-            <h3 className="font-semibold text-slate-700">No accounts active yet</h3>
-            <p className="text-sm text-slate-400 max-w-md mx-auto mt-1">
-              Your primary account will be automatically provisioned once your onboarding verification is approved.
-            </p>
-          </div>
-        ) : (
-          <div className="divide-y divide-slate-100">
-            {accounts.map((acc) => (
-              <div key={acc.id} className="p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-slate-50/50 transition">
-                <div>
-                  <div className="flex items-center space-x-2">
-                    <span className="font-mono font-bold text-slate-900 text-base">
-                      {acc.accountNumber}
-                    </span>
-                    <span className="px-2 py-0.5 rounded text-xs font-semibold bg-emerald-100 text-emerald-800 uppercase">
-                      {acc.status}
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-400 mt-1">
-                    Currency: {acc.currency} • Type: {acc.accountType}
-                  </p>
-                </div>
-
-                <div className="flex items-center space-x-4">
-                  <div className="text-right">
-                    <div className="text-xl font-extrabold text-slate-900">
-                      {formatCurrency(acc.cachedBalance, acc.currency)}
-                    </div>
-                    <span className="text-xs text-slate-400">Available Balance</span>
-                  </div>
-                  <Link
-                    to={`/accounts/${acc.id}/ledger`}
-                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition"
-                  >
-                    View Ledger
-                  </Link>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+        {/* Table sitting directly on page with 2px strong top border and 1px bottom border per spec §6 */}
+        <div className="w-full overflow-x-auto border-t-2 border-t-rule-strong border-b border-b-rule">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-paper-sunk border-b border-rule">
+                <th
+                  scope="col"
+                  className="py-2.5 px-4 text-[11.5px] font-mono uppercase tracking-[0.06em] font-semibold text-ink-soft select-none"
+                >
+                  Date
+                </th>
+                <th
+                  scope="col"
+                  className="py-2.5 px-4 text-[11.5px] font-mono uppercase tracking-[0.06em] font-semibold text-ink-soft select-none"
+                >
+                  Reference
+                </th>
+                <th
+                  scope="col"
+                  className="py-2.5 px-4 text-[11.5px] font-mono uppercase tracking-[0.06em] font-semibold text-ink-soft select-none"
+                >
+                  Description
+                </th>
+                <th
+                  scope="col"
+                  className="py-2.5 px-4 text-[11.5px] font-mono uppercase tracking-[0.06em] font-semibold text-ink-soft text-right select-none"
+                >
+                  Debit (Out)
+                </th>
+                <th
+                  scope="col"
+                  className="py-2.5 px-4 text-[11.5px] font-mono uppercase tracking-[0.06em] font-semibold text-ink-soft text-right select-none"
+                >
+                  Credit (In)
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-rule text-[14px]">
+              {recentEntries.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="py-8 text-center text-ink-soft">
+                    <p className="font-serif text-base text-ink mb-1">
+                      No entries recorded yet.
+                    </p>
+                    <p className="text-xs text-ink-faint">
+                      Entries appear here once the account moves funds.
+                    </p>
+                  </td>
+                </tr>
+              ) : (
+                recentEntries.map((entry) => {
+                  const isDebit = entry.direction === 'DEBIT';
+                  const isCredit = entry.direction === 'CREDIT';
+                  return (
+                    <tr
+                      key={entry.id}
+                      className="h-11 hover:bg-paper-sunk/60 transition-colors"
+                    >
+                      <td className="py-2.5 px-4 font-mono text-xs text-ink-soft whitespace-nowrap">
+                        {new Date(entry.createdAt).toISOString().replace('T', ' ').substring(0, 16)}
+                      </td>
+                      <td className="py-2.5 px-4 font-mono text-xs font-semibold text-ink">
+                        {entry.transaction?.reference || '—'}
+                      </td>
+                      <td className="py-2.5 px-4 text-ink truncate max-w-[280px]">
+                        {entry.transaction?.description || 'Account Movement'}
+                      </td>
+                      <td className="py-2.5 px-4 text-right">
+                        {isDebit ? (
+                          <MoneyCell
+                            amount={entry.amount}
+                            isCents={true}
+                            direction="DEBIT"
+                          />
+                        ) : (
+                          <span className="text-ink-faint font-mono text-xs">—</span>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-4 text-right">
+                        {isCredit ? (
+                          <MoneyCell
+                            amount={entry.amount}
+                            isCents={true}
+                            direction="CREDIT"
+                          />
+                        ) : (
+                          <span className="text-ink-faint font-mono text-xs">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
 };
-

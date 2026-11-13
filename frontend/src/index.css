@@ -2,9 +2,56 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
+:root {
+  --paper: #F5F2EA;
+  --paper-raised: #FBF9F4;
+  --paper-sunk: #ECE8DD;
+  --ink: #1C211E;
+  --ink-soft: #4A524D;
+  --ink-faint: #7C847E;
+  --rule: #D6D0C2;
+  --rule-strong: #1C211E;
+  --green: #1F4D3F;
+  --green-hover: #173A30;
+  --green-wash: #DCE7E0;
+  --brass: #A87B2A;
+  --brass-wash: #F0E4C8;
+  --oxblood: #8A2E2A;
+  --oxblood-wash: #F1DAD7;
+  --slate-blue: #2F4A6B;
 }
 
+@layer base {
+  body {
+    background-color: var(--paper);
+    color: var(--ink);
+    font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Ruled double line utility for ledger balances and footers */
+  .border-double-rule {
+    border-top: 3px double var(--rule-strong);
+  }
+
+  /* Focus outline compliant with WCAG 2.2 AA (2px solid, offset 2px) */
+  :focus-visible {
+    outline: 2px solid var(--green);
+    outline-offset: 2px;
+  }
+
+  /* Tabular numbers for all monospace and money values */
+  .font-mono {
+    font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .font-serif {
+    font-family: 'Newsreader', Georgia, Cambria, 'Times New Roman', Times, serif;
+  }
+
+  .font-sans {
+    font-family: 'IBM Plex Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+}

@@ -1,8 +1,10 @@
+# Local dev: DB + Redis only. Backend & frontend run on host.
+# Usage: docker compose -f docker-compose.dev.yml up -d
 services:
   postgres:
     image: postgres:16-alpine
     container_name: balancevault-postgres
-    restart: always
+    restart: unless-stopped
     environment:
       POSTGRES_USER: balancevault
       POSTGRES_PASSWORD: balancevault_root_pass
@@ -21,7 +23,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: balancevault-redis
-    restart: always
+    restart: unless-stopped
     ports:
       - "6379:6379"
     volumes:
@@ -31,39 +33,6 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-
-  api:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: balancevault-api
-    restart: always
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    ports:
-      - "4000:4000"
-    environment:
-      PORT: 4000
-      NODE_ENV: production
-      DATABASE_URL: postgresql://balancevault_app:app_secret_pass@postgres:5432/balancevault?schema=public
-      DATABASE_URL_MIGRATE: postgresql://balancevault_migrator:migrator_secret_pass@postgres:5432/balancevault?schema=public
-      REDIS_URL: redis://redis:6379
-      JWT_SECRET: super_secure_jwt_secret_balancevault_2026
-      JWT_EXPIRES_IN: 1h
-
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: balancevault-frontend
-    restart: always
-    depends_on:
-      - api
-    ports:
-      - "3000:80"
 
 volumes:
   postgres_data:

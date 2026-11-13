@@ -1,21 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { apiRequest, formatCurrency } from '../lib/api.js';
-import {
-  History,
-  ArrowLeft,
-  ShieldCheck,
-  CheckCircle,
-  FileSpreadsheet,
-  Calendar,
-  Hash
-} from 'lucide-react';
+import { apiRequest } from '../lib/api.js';
+import { Badge } from '../components/ui/Badge.js';
+import { Button } from '../components/ui/Button.js';
+import { MoneyCell } from '../components/ui/MoneyCell.js';
 
 export const AccountLedger: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [account, setAccount] = useState<any>(null);
   const [ledgerEntries, setLedgerEntries] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [directionFilter, setDirectionFilter] = useState<'ALL' | 'DEBIT' | 'CREDIT'>('ALL');
 
   useEffect(() => {
     async function loadData() {
@@ -36,121 +33,325 @@ export const AccountLedger: React.FC = () => {
     loadData();
   }, [id]);
 
+  const toggleExpand = (entryId: string) => {
+    setExpandedRowId((prev) => (prev === entryId ? null : entryId));
+  };
+
+  const copyToClipboard = (text: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(text);
+  };
+
+  // Filter entries
+  const filteredEntries = ledgerEntries.filter((entry) => {
+    if (directionFilter !== 'ALL' && entry.direction !== directionFilter) {
+      return false;
+    }
+    if (searchTerm) {
+      const q = searchTerm.toLowerCase();
+      const ref = (entry.transaction?.reference || '').toLowerCase();
+      const desc = (entry.transaction?.description || '').toLowerCase();
+      return ref.includes(q) || desc.includes(q);
+    }
+    return true;
+  });
+
+  // Calculate totals
+  const totalDebits = filteredEntries
+    .filter((e) => e.direction === 'DEBIT')
+    .reduce((sum, e) => sum + e.amount, 0);
+
+  const totalCredits = filteredEntries
+    .filter((e) => e.direction === 'CREDIT')
+    .reduce((sum, e) => sum + e.amount, 0);
+
   if (loading) {
     return (
-      <div className="max-w-7xl mx-auto py-12 px-4 text-center">
-        <div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-        <p className="text-slate-500">Loading double-entry ledger statement...</p>
+      <div className="space-y-4 text-left">
+        <div className="h-8 w-64 bg-paper-sunk rounded-[2px] animate-pulse" />
+        <div className="h-64 w-full bg-paper-sunk rounded-[2px] animate-pulse" />
       </div>
     );
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-      {/* Navigation & Header */}
-      <div className="flex items-center space-x-3">
-        <Link
-          to="/accounts"
-          className="p-2 bg-white border border-slate-200 rounded-xl text-slate-600 hover:text-slate-900 shadow-sm transition"
-        >
-          <ArrowLeft className="w-4 h-4" />
-        </Link>
+    <div className="space-y-6 text-left">
+      {/* Header and Title */}
+      <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-4 pb-4 border-b border-rule">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">
-            Double-Entry Ledger Statement
+          <div className="flex items-center gap-2 text-xs font-mono text-ink-soft mb-1">
+            <Link to="/accounts" className="hover:underline">
+              ← Accounts
+            </Link>
+            <span>/</span>
+            <span>{account?.accountNumber}</span>
+          </div>
+          <h1 className="font-serif text-[32px] leading-[38px] font-medium text-ink flex items-center gap-3">
+            <span>Account Statement</span>
+            <span className="font-mono text-2xl font-semibold">
+              {account?.accountNumber}
+            </span>
+            <Badge variant={account?.status === 'ACTIVE' ? 'green' : 'brass'}>
+              {account?.status}
+            </Badge>
           </h1>
-          <p className="text-sm text-slate-500">
-            Account: <span className="font-mono font-semibold text-slate-700">{account?.accountNumber}</span> • Status: <span className="font-semibold text-emerald-600">{account?.status}</span>
+          <p className="text-[13px] text-ink-soft mt-1">
+            Double-entry verified statement • Currency: {account?.currency || 'USD'}
           </p>
         </div>
-      </div>
 
-      {/* Summary Card */}
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-            Current Cached Balance
+        <div className="text-right">
+          <span className="text-[11.5px] font-mono uppercase tracking-[0.06em] text-ink-soft block mb-1">
+            Closing Balance
           </span>
-          <div className="text-3xl font-extrabold text-slate-900 mt-1">
-            {formatCurrency(account?.cachedBalance || 0, account?.currency)}
-          </div>
-        </div>
-
-        <div className="flex items-center space-x-3 bg-emerald-50 border border-emerald-200 px-4 py-3 rounded-xl text-emerald-900">
-          <ShieldCheck className="w-6 h-6 text-emerald-600 flex-shrink-0" />
-          <div className="text-xs">
-            <span className="font-bold block">Double-Entry Cryptographic Invariant:</span>
-            Every transaction is balanced where &Sigma;(Debits) = &Sigma;(Credits).
-          </div>
+          <MoneyCell
+            amount={account?.cachedBalance || 0}
+            isCents={true}
+            direction="BALANCE"
+            className="text-2xl font-bold"
+          />
         </div>
       </div>
 
-      {/* Ledger Table */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <FileSpreadsheet className="w-5 h-5 text-emerald-600" />
-            <h2 className="font-bold text-slate-900">Recorded Movements ({ledgerEntries.length})</h2>
-          </div>
+      {/* Flat Filter Row per spec §7.4 (No pill chips) */}
+      <div className="p-3 bg-paper-raised border border-rule flex flex-wrap items-center gap-4 text-sm">
+        <div className="flex items-center gap-2">
+          <label htmlFor="search-input" className="text-xs font-mono uppercase text-ink-soft select-none">
+            Search
+          </label>
+          <input
+            id="search-input"
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Reference or description…"
+            className="h-8 px-2.5 bg-paper text-xs font-mono border border-rule rounded-[2px] focus:outline-none focus:border-green"
+          />
         </div>
 
-        {ledgerEntries.length === 0 ? (
-          <div className="p-12 text-center">
-            <History className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-            <h3 className="font-semibold text-slate-700">No ledger movements yet</h3>
-            <p className="text-sm text-slate-400 max-w-sm mx-auto mt-1">
-              Deposit or withdraw funds to see balanced double-entry entries recorded in real time.
-            </p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 text-slate-500 uppercase text-xs border-b border-slate-100 font-semibold tracking-wider">
-                <tr>
-                  <th className="px-6 py-3.5">Timestamp</th>
-                  <th className="px-6 py-3.5">Transaction Ref</th>
-                  <th className="px-6 py-3.5">Description</th>
-                  <th className="px-6 py-3.5 text-right">Debit (-)</th>
-                  <th className="px-6 py-3.5 text-right">Credit (+)</th>
-                  <th className="px-6 py-3.5 text-center">Balanced Check</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 font-mono text-xs">
-                {ledgerEntries.map((entry) => {
-                  const isDebit = entry.direction === 'DEBIT';
-                  const isCredit = entry.direction === 'CREDIT';
-                  return (
-                    <tr key={entry.id} className="hover:bg-slate-50/80 transition">
-                      <td className="px-6 py-4 text-slate-600 whitespace-nowrap font-sans">
-                        {new Date(entry.createdAt).toLocaleString()}
+        <div className="flex items-center gap-2">
+          <label htmlFor="type-select" className="text-xs font-mono uppercase text-ink-soft select-none">
+            Type
+          </label>
+          <select
+            id="type-select"
+            value={directionFilter}
+            onChange={(e) => setDirectionFilter(e.target.value as any)}
+            className="h-8 px-2 bg-paper text-xs font-mono border border-rule rounded-[2px] focus:outline-none focus:border-green"
+          >
+            <option value="ALL">All Entries</option>
+            <option value="CREDIT">Credits (+)</option>
+            <option value="DEBIT">Debits (−)</option>
+          </select>
+        </div>
+
+        {(searchTerm || directionFilter !== 'ALL') && (
+          <button
+            type="button"
+            onClick={() => {
+              setSearchTerm('');
+              setDirectionFilter('ALL');
+            }}
+            className="text-xs font-sans text-green hover:underline ml-auto font-medium"
+          >
+            Reset Filters
+          </button>
+        )}
+      </div>
+
+      {/* Ledger Table (sitting directly on page with 2px top rule and 1px bottom rule) */}
+      <div className="w-full overflow-x-auto border-t-2 border-t-rule-strong border-b border-b-rule">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="bg-paper-sunk border-b border-rule">
+              <th
+                scope="col"
+                className="py-2.5 px-4 text-[11.5px] font-mono uppercase tracking-[0.06em] font-semibold text-ink-soft select-none"
+              >
+                Date & Time (UTC)
+              </th>
+              <th
+                scope="col"
+                className="py-2.5 px-4 text-[11.5px] font-mono uppercase tracking-[0.06em] font-semibold text-ink-soft select-none"
+              >
+                Reference
+              </th>
+              <th
+                scope="col"
+                className="py-2.5 px-4 text-[11.5px] font-mono uppercase tracking-[0.06em] font-semibold text-ink-soft select-none"
+              >
+                Description
+              </th>
+              <th
+                scope="col"
+                className="py-2.5 px-4 text-[11.5px] font-mono uppercase tracking-[0.06em] font-semibold text-ink-soft text-right select-none"
+              >
+                Debit (−)
+              </th>
+              <th
+                scope="col"
+                className="py-2.5 px-4 text-[11.5px] font-mono uppercase tracking-[0.06em] font-semibold text-ink-soft text-right select-none"
+              >
+                Credit (+)
+              </th>
+              <th
+                scope="col"
+                className="py-2.5 px-4 text-[11.5px] font-mono uppercase tracking-[0.06em] font-semibold text-ink-soft text-center select-none"
+              >
+                Invariant
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-rule text-[14px]">
+            {filteredEntries.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="py-12 text-center text-ink-soft">
+                  <p className="font-serif text-lg text-ink mb-1">
+                    No matching ledger entries found.
+                  </p>
+                  <p className="text-xs text-ink-faint">
+                    Adjust your filter criteria or record a deposit or withdrawal.
+                  </p>
+                </td>
+              </tr>
+            ) : (
+              filteredEntries.map((entry) => {
+                const isDebit = entry.direction === 'DEBIT';
+                const isCredit = entry.direction === 'CREDIT';
+                const isExpanded = expandedRowId === entry.id;
+
+                return (
+                  <React.Fragment key={entry.id}>
+                    <tr
+                      onClick={() => toggleExpand(entry.id)}
+                      className={`h-11 cursor-pointer transition-colors ${
+                        isExpanded ? 'bg-paper-raised' : 'hover:bg-paper-sunk/60'
+                      }`}
+                    >
+                      <td className="py-2.5 px-4 font-mono text-xs text-ink-soft whitespace-nowrap">
+                        {new Date(entry.createdAt).toISOString().replace('T', ' ').substring(0, 16)}
                       </td>
-                      <td className="px-6 py-4 font-bold text-slate-800">
-                        {entry.transaction?.reference || 'N/A'}
-                      </td>
-                      <td className="px-6 py-4 text-slate-600 font-sans">
-                        {entry.transaction?.description || 'Money movement'}
-                      </td>
-                      <td className="px-6 py-4 text-right font-bold text-rose-600 whitespace-nowrap">
-                        {isDebit ? formatCurrency(entry.amount, account?.currency) : '—'}
-                      </td>
-                      <td className="px-6 py-4 text-right font-bold text-emerald-600 whitespace-nowrap">
-                        {isCredit ? formatCurrency(entry.amount, account?.currency) : '—'}
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-sans font-semibold bg-emerald-100 text-emerald-800">
-                          <CheckCircle className="w-3 h-3 mr-1" />
-                          Balanced
+                      <td className="py-2.5 px-4 font-mono text-xs font-semibold text-ink">
+                        <span className="mr-2">
+                          {entry.transaction?.reference || '—'}
                         </span>
+                        <button
+                          type="button"
+                          onClick={(e) => copyToClipboard(entry.transaction?.reference || '', e)}
+                          title="Copy reference"
+                          className="text-[11px] text-green hover:underline select-none"
+                        >
+                          Copy
+                        </button>
+                      </td>
+                      <td className="py-2.5 px-4 text-ink truncate max-w-[280px]">
+                        {entry.transaction?.description || 'Account Movement'}
+                      </td>
+                      <td className="py-2.5 px-4 text-right">
+                        {isDebit ? (
+                          <MoneyCell
+                            amount={entry.amount}
+                            isCents={true}
+                            direction="DEBIT"
+                          />
+                        ) : (
+                          <span className="text-ink-faint font-mono text-xs">—</span>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-4 text-right">
+                        {isCredit ? (
+                          <MoneyCell
+                            amount={entry.amount}
+                            isCents={true}
+                            direction="CREDIT"
+                          />
+                        ) : (
+                          <span className="text-ink-faint font-mono text-xs">—</span>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-4 text-center">
+                        <Badge variant="green">BALANCED</Badge>
                       </td>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+
+                    {/* Inline Row Expand (Left 3px bar per spec §6) */}
+                    {isExpanded && (
+                      <tr className="bg-paper-raised">
+                        <td
+                          colSpan={6}
+                          className="p-4 border-l-[3px] border-l-rule-strong bg-paper-sunk/30"
+                        >
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs font-mono text-ink">
+                            <div>
+                              <span className="text-ink-soft block text-[11px] uppercase">
+                                Entry ID
+                              </span>
+                              <span className="font-semibold select-all">
+                                {entry.id}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-ink-soft block text-[11px] uppercase">
+                                Transaction ID
+                              </span>
+                              <span className="font-semibold select-all">
+                                {entry.transactionId}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-ink-soft block text-[11px] uppercase">
+                                Direction & Magnitude
+                              </span>
+                              <span>
+                                {entry.direction} of {entry.amount} cents
+                              </span>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                );
+              })
+            )}
+          </tbody>
+
+          {/* Table Footer with Period Totals (Double rule above per spec §6 & §7.4) */}
+          {filteredEntries.length > 0 && (
+            <tfoot>
+              <tr className="bg-paper-sunk font-mono text-xs font-semibold text-ink border-double-rule">
+                <td colSpan={3} className="py-3 px-4 uppercase text-[11.5px] tracking-wider text-ink-soft">
+                  Period Movement Totals ({filteredEntries.length} entries)
+                </td>
+                <td className="py-3 px-4 text-right">
+                  <MoneyCell
+                    amount={totalDebits}
+                    isCents={true}
+                    direction="DEBIT"
+                    className="font-bold text-xs"
+                  />
+                </td>
+                <td className="py-3 px-4 text-right">
+                  <MoneyCell
+                    amount={totalCredits}
+                    isCents={true}
+                    direction="CREDIT"
+                    className="font-bold text-xs"
+                  />
+                </td>
+                <td className="py-3 px-4 text-center text-ink-soft text-[11px]">
+                  Double-entry verified
+                </td>
+              </tr>
+            </tfoot>
+          )}
+        </table>
+      </div>
+
+      <div className="flex items-center justify-between text-xs text-ink-soft font-mono pt-2">
+        <span>Showing {filteredEntries.length} of {ledgerEntries.length} recorded entries</span>
+        <span>BalanceVault Invariant: Σ(Debits) = Σ(Credits) enforced atomically</span>
       </div>
     </div>
   );
 };
-

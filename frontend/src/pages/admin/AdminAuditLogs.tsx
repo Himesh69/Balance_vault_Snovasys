@@ -1,16 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { apiRequest } from '../../lib/api.js';
-import {
-  History,
-  Search,
-  Filter,
-  Eye,
-  ShieldCheck,
-  Calendar,
-  User,
-  X,
-  Code
-} from 'lucide-react';
+import { Badge } from '../../components/ui/Badge.js';
+import { Button } from '../../components/ui/Button.js';
 
 export const AdminAuditLogs: React.FC = () => {
   const [logs, setLogs] = useState<any[]>([]);
@@ -18,7 +9,7 @@ export const AdminAuditLogs: React.FC = () => {
   const [actionFilter, setActionFilter] = useState('');
   const [resourceTypeFilter, setResourceTypeFilter] = useState('');
   const [loading, setLoading] = useState(true);
-  const [selectedLog, setSelectedLog] = useState<any>(null);
+  const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
 
   const fetchLogs = async () => {
     setLoading(true);
@@ -42,173 +33,249 @@ export const AdminAuditLogs: React.FC = () => {
     fetchLogs();
   }, [actionFilter, resourceTypeFilter]);
 
+  const toggleExpand = (id: string) => {
+    setExpandedLogId((prev) => (prev === id ? null : id));
+  };
+
+  const copyPayload = (payload: any, e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
+  };
+
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-      {/* Header */}
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="space-y-6 text-left">
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-4 pb-4 border-b border-rule">
         <div>
-          <div className="flex items-center space-x-2">
-            <h1 className="text-2xl font-bold text-slate-900">Immutable Audit Trail</h1>
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-purple-100 text-purple-800 border border-purple-200">
-              Append-Only
-            </span>
+          <div className="flex items-center gap-3">
+            <h1 className="font-serif text-[32px] leading-[38px] font-medium text-ink">
+              Audit Log Trail
+            </h1>
+            <Badge variant="slate-blue">IMMUTABLE</Badge>
           </div>
-          <p className="text-sm text-slate-500 mt-1">
-            Cryptographically guaranteed record of 100% of critical transactions, role changes, and onboarding decisions.
+          <p className="text-[13px] text-ink-soft mt-1">
+            System-wide append-only ledger of authorization, identity, and fund movement events.
           </p>
         </div>
-        <div className="text-xs font-semibold px-3 py-1.5 bg-slate-100 text-slate-700 rounded-xl">
-          Total Recorded Events: {total}
+        <div className="text-xs font-mono text-ink-soft">
+          Total Recorded Events: <span className="font-bold text-ink">{total}</span>
         </div>
       </div>
 
-      {/* Filter Bar */}
-      <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col sm:flex-row gap-3">
-        <div className="flex-1">
+      {/* Flat Filter Row (§7.4/7.8) */}
+      <div className="p-3 bg-paper-raised border border-rule flex flex-wrap items-center gap-4 text-sm">
+        <div className="flex items-center gap-2">
+          <label htmlFor="action-filter" className="text-xs font-mono uppercase text-ink-soft select-none">
+            Action Code
+          </label>
           <input
+            id="action-filter"
             type="text"
             value={actionFilter}
             onChange={(e) => setActionFilter(e.target.value)}
-            placeholder="Filter by Action (e.g. LEDGER, ONBOARDING, USER)..."
-            className="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-purple-500 focus:outline-none"
+            placeholder="e.g. USER, LEDGER, ONBOARDING…"
+            className="h-8 px-2.5 bg-paper text-xs font-mono border border-rule rounded-[2px] focus:outline-none focus:border-green"
           />
         </div>
 
-        <select
-          value={resourceTypeFilter}
-          onChange={(e) => setResourceTypeFilter(e.target.value)}
-          className="px-3.5 py-2 border border-slate-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-purple-500 focus:outline-none"
-        >
-          <option value="">All Resource Types</option>
-          <option value="USER">USER</option>
-          <option value="ONBOARDING">ONBOARDING</option>
-          <option value="ACCOUNT">ACCOUNT</option>
-          <option value="LEDGER_TRANSACTION">LEDGER_TRANSACTION</option>
-          <option value="SYSTEM">SYSTEM</option>
-        </select>
-
-        <button
-          onClick={fetchLogs}
-          className="px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-semibold hover:bg-slate-800 transition"
-        >
-          Refresh
-        </button>
-      </div>
-
-      {/* Logs Table */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        {loading ? (
-          <div className="py-12 text-center">
-            <div className="w-8 h-8 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-            <p className="text-slate-500 text-sm">Loading audit events...</p>
-          </div>
-        ) : logs.length === 0 ? (
-          <div className="p-8 text-center text-slate-500 text-sm">No audit logs matching query.</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 text-slate-500 uppercase text-xs border-b border-slate-100 font-semibold tracking-wider">
-                <tr>
-                  <th className="px-6 py-3.5">Timestamp</th>
-                  <th className="px-6 py-3.5">Action</th>
-                  <th className="px-6 py-3.5">Actor</th>
-                  <th className="px-6 py-3.5">Resource</th>
-                  <th className="px-6 py-3.5">IP Address</th>
-                  <th className="px-6 py-3.5 text-right">Details</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-xs">
-                {logs.map((log) => (
-                  <tr key={log.id} className="hover:bg-slate-50/80 transition">
-                    <td className="px-6 py-4 text-slate-500 whitespace-nowrap">
-                      {new Date(log.createdAt).toLocaleString()}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="font-mono font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded">
-                        {log.action}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="font-semibold text-slate-800">
-                        {log.user?.fullName || (log.actorId === 'SYSTEM' ? 'SYSTEM' : log.actorId)}
-                      </div>
-                      <div className="text-[11px] text-slate-400 font-mono">
-                        {log.user?.email || log.actorId}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="font-semibold text-slate-700">{log.resourceType}</span>
-                      <div className="text-[11px] text-slate-400 font-mono truncate max-w-[120px]">
-                        {log.resourceId}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-slate-500 font-mono text-[11px]">
-                      {log.ip || 'internal'}
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <button
-                        onClick={() => setSelectedLog(log)}
-                        className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-semibold transition"
-                      >
-                        Inspect
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* Snapshot Inspector Modal */}
-      {selectedLog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center space-x-2">
-                <Code className="w-5 h-5 text-purple-600" />
-                <h3 className="font-bold text-lg text-slate-900">
-                  Audit Snapshot: {selectedLog.action}
-                </h3>
-              </div>
-              <button onClick={() => setSelectedLog(null)} className="text-slate-400 hover:text-slate-600">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="mt-4 space-y-4 text-xs">
-              <div className="grid grid-cols-2 gap-3 p-4 bg-slate-50 rounded-xl">
-                <div><span className="font-semibold text-slate-400 uppercase">Log ID:</span> <span className="font-mono">{selectedLog.id}</span></div>
-                <div><span className="font-semibold text-slate-400 uppercase">Timestamp:</span> <span>{new Date(selectedLog.createdAt).toISOString()}</span></div>
-                <div><span className="font-semibold text-slate-400 uppercase">Actor:</span> <span>{selectedLog.user?.email || selectedLog.actorId}</span></div>
-                <div><span className="font-semibold text-slate-400 uppercase">Resource:</span> <span>{selectedLog.resourceType} ({selectedLog.resourceId})</span></div>
-                <div><span className="font-semibold text-slate-400 uppercase">Client IP:</span> <span className="font-mono">{selectedLog.ip || 'N/A'}</span></div>
-                <div><span className="font-semibold text-slate-400 uppercase">User Agent:</span> <span className="truncate block font-mono">{selectedLog.userAgent || 'N/A'}</span></div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">
-                  Metadata Snapshot (JSON)
-                </label>
-                <pre className="p-4 bg-slate-900 text-emerald-400 rounded-xl font-mono text-xs overflow-x-auto">
-                  {JSON.stringify(selectedLog.metadata, null, 2)}
-                </pre>
-              </div>
-            </div>
-
-            <div className="mt-6 flex justify-end">
-              <button
-                onClick={() => setSelectedLog(null)}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition"
-              >
-                Close
-              </button>
-            </div>
-          </div>
+        <div className="flex items-center gap-2">
+          <label htmlFor="resource-filter" className="text-xs font-mono uppercase text-ink-soft select-none">
+            Resource
+          </label>
+          <select
+            id="resource-filter"
+            value={resourceTypeFilter}
+            onChange={(e) => setResourceTypeFilter(e.target.value)}
+            className="h-8 px-2 bg-paper text-xs font-mono border border-rule rounded-[2px] focus:outline-none focus:border-green"
+          >
+            <option value="">All Resource Types</option>
+            <option value="USER">USER</option>
+            <option value="ONBOARDING">ONBOARDING</option>
+            <option value="ACCOUNT">ACCOUNT</option>
+            <option value="LEDGER_TRANSACTION">LEDGER_TRANSACTION</option>
+            <option value="SYSTEM">SYSTEM</option>
+          </select>
         </div>
-      )}
+
+        <div className="ml-auto flex items-center gap-2">
+          {(actionFilter || resourceTypeFilter) && (
+            <button
+              type="button"
+              onClick={() => {
+                setActionFilter('');
+                setResourceTypeFilter('');
+              }}
+              className="text-xs font-sans text-green hover:underline font-medium mr-2"
+            >
+              Reset
+            </button>
+          )}
+          <Button variant="secondary" onClick={fetchLogs} className="h-8 text-xs px-3">
+            Refresh
+          </Button>
+        </div>
+      </div>
+
+      {/* Ledger Table (2px top rule, 1px bottom rule, sitting directly on page per spec §6 & §7.8) */}
+      <div className="w-full overflow-x-auto border-t-2 border-t-rule-strong border-b border-b-rule">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="bg-paper-sunk border-b border-rule">
+              <th
+                scope="col"
+                className="py-2.5 px-4 text-[11.5px] font-mono uppercase tracking-[0.06em] font-semibold text-ink-soft select-none"
+              >
+                Timestamp (UTC)
+              </th>
+              <th
+                scope="col"
+                className="py-2.5 px-4 text-[11.5px] font-mono uppercase tracking-[0.06em] font-semibold text-ink-soft select-none"
+              >
+                Actor
+              </th>
+              <th
+                scope="col"
+                className="py-2.5 px-4 text-[11.5px] font-mono uppercase tracking-[0.06em] font-semibold text-ink-soft select-none"
+              >
+                Action Code
+              </th>
+              <th
+                scope="col"
+                className="py-2.5 px-4 text-[11.5px] font-mono uppercase tracking-[0.06em] font-semibold text-ink-soft select-none"
+              >
+                Resource Target
+              </th>
+              <th
+                scope="col"
+                className="py-2.5 px-4 text-[11.5px] font-mono uppercase tracking-[0.06em] font-semibold text-ink-soft select-none"
+              >
+                IP Address
+              </th>
+              <th
+                scope="col"
+                className="py-2.5 px-4 text-[11.5px] font-mono uppercase tracking-[0.06em] font-semibold text-ink-soft text-right select-none"
+              >
+                Payload
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-rule text-[14px]">
+            {loading ? (
+              <tr>
+                <td colSpan={6} className="py-12 text-center text-ink-soft">
+                  <p className="font-mono text-xs">Loading immutable audit trail…</p>
+                </td>
+              </tr>
+            ) : logs.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="py-12 text-center text-ink-soft">
+                  <p className="font-serif text-lg text-ink mb-1">
+                    No audit entries matching filter criteria.
+                  </p>
+                  <p className="text-xs text-ink-faint">
+                    Events are recorded synchronously inside each database transaction.
+                  </p>
+                </td>
+              </tr>
+            ) : (
+              logs.map((log) => {
+                const isExpanded = expandedLogId === log.id;
+                return (
+                  <React.Fragment key={log.id}>
+                    <tr
+                      onClick={() => toggleExpand(log.id)}
+                      className={`h-11 cursor-pointer transition-colors ${
+                        isExpanded ? 'bg-paper-raised' : 'hover:bg-paper-sunk/60'
+                      }`}
+                    >
+                      <td className="py-2.5 px-4 font-mono text-xs text-ink-soft whitespace-nowrap">
+                        {new Date(log.createdAt).toISOString().replace('T', ' ').substring(0, 19)}
+                      </td>
+                      <td className="py-2.5 px-4 text-xs font-mono text-ink truncate max-w-[180px]">
+                        {log.user?.email || log.actorId || 'SYSTEM'}
+                      </td>
+                      <td className="py-2.5 px-4 font-mono text-xs font-semibold text-ink">
+                        {log.action}
+                      </td>
+                      <td className="py-2.5 px-4 font-mono text-xs text-ink-soft">
+                        <span className="text-ink font-medium">{log.resourceType}</span>
+                        {log.resourceId && (
+                          <span className="text-ink-faint ml-1">
+                            ({log.resourceId.substring(0, 8)}…)
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-4 font-mono text-xs text-ink-faint">
+                        {log.ip || '127.0.0.1'}
+                      </td>
+                      <td className="py-2.5 px-4 text-right">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleExpand(log.id);
+                          }}
+                          className="text-xs font-mono text-green hover:underline select-none"
+                        >
+                          {isExpanded ? 'Hide' : 'Inspect'}
+                        </button>
+                      </td>
+                    </tr>
+
+                    {/* Expandable JSON Payload in mono <pre> on --paper-sunk (§7.8) */}
+                    {isExpanded && (
+                      <tr className="bg-paper-raised">
+                        <td
+                          colSpan={6}
+                          className="p-4 border-l-[3px] border-l-rule-strong bg-paper-sunk/40"
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-mono uppercase text-ink-soft font-semibold">
+                              Metadata Payload ({log.action})
+                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => copyPayload(log.metadata, e)}
+                              className="text-xs font-mono text-green hover:underline select-none"
+                            >
+                              Copy JSON
+                            </button>
+                          </div>
+                          <pre className="p-3 bg-paper-sunk border border-rule text-xs font-mono text-ink overflow-x-auto rounded-[2px] leading-relaxed max-h-64">
+                            {JSON.stringify(
+                              {
+                                id: log.id,
+                                actorId: log.actorId,
+                                action: log.action,
+                                resourceType: log.resourceType,
+                                resourceId: log.resourceId,
+                                ip: log.ip,
+                                userAgent: log.userAgent,
+                                metadata: log.metadata,
+                                recordedAt: log.createdAt,
+                              },
+                              null,
+                              2
+                            )}
+                          </pre>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Footer Note per spec §7.8 */}
+      <div className="pt-2 flex items-center justify-between text-[12.5px] text-ink-soft font-sans">
+        <span>Audit entries are append-only.</span>
+        <span className="font-mono text-xs text-ink-faint">
+          Enforced by database permissions & immutability constraints.
+        </span>
+      </div>
     </div>
   );
 };
-

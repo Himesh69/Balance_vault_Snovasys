@@ -1,19 +1,34 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.js';
 import { apiRequest } from '../lib/api.js';
-import { ShieldCheck, Lock, Mail, AlertCircle, ArrowRight } from 'lucide-react';
+import { Button } from '../components/ui/Button.js';
+import { Input } from '../components/ui/Input.js';
+import { Panel } from '../components/ui/Panel.js';
+import { Banner } from '../components/ui/Banner.js';
 
 export const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [rateLimitSeconds, setRateLimitSeconds] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
+  // Rate-limit countdown timer if 429 occurs
+  useEffect(() => {
+    if (rateLimitSeconds === null || rateLimitSeconds <= 0) return;
+    const timer = setInterval(() => {
+      setRateLimitSeconds((prev) => (prev && prev > 1 ? prev - 1 : null));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [rateLimitSeconds]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (rateLimitSeconds && rateLimitSeconds > 0) return;
+
     setError(null);
     setLoading(true);
 
@@ -30,7 +45,11 @@ export const Login: React.FC = () => {
         navigate('/dashboard');
       }
     } catch (err: any) {
-      setError(err.message || 'Login failed. Please check your credentials.');
+      // Check for rate limit response
+      if (err.message && err.message.toLowerCase().includes('rate limit')) {
+        setRateLimitSeconds(60);
+      }
+      setError(err.message || 'Invalid email or password.');
     } finally {
       setLoading(false);
     }
@@ -39,99 +58,131 @@ export const Login: React.FC = () => {
   const fillAdmin = () => {
     setEmail('admin@balancevault.com');
     setPassword('Admin@123456');
+    setError(null);
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-900 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8 bg-slate-800 p-8 rounded-2xl shadow-2xl border border-slate-700">
-        <div>
-          <div className="flex justify-center">
-            <div className="p-3 bg-emerald-600 rounded-xl text-white shadow-lg">
-              <ShieldCheck className="w-8 h-8" />
-            </div>
+    <div className="min-h-screen bg-paper text-ink flex flex-col justify-start px-6 pt-[14vh] pb-12 items-center sm:items-start sm:pl-[12vw]">
+      <div className="w-full max-w-[440px]">
+        {/* Document Header Wordmark & Tagline */}
+        <div className="mb-6 select-none text-left">
+          <div className="flex items-center gap-2 mb-2">
+            <svg
+              className="w-5 h-5 text-ink flex-shrink-0"
+              viewBox="0 0 20 20"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+            >
+              <rect x="2" y="2" width="16" height="16" rx="1" />
+              <line x1="2" y1="7.5" x2="18" y2="7.5" />
+              <line x1="2" y1="13" x2="18" y2="13" />
+            </svg>
+            <span className="font-serif text-2xl font-semibold tracking-tight text-ink">
+              BalanceVault
+            </span>
           </div>
-          <h2 className="mt-4 text-center text-3xl font-extrabold text-white">
-            BalanceVault
-          </h2>
-          <p className="mt-1 text-center text-sm text-slate-400">
-            Money Movement with a Ledger You Can Prove
+          <p className="font-serif italic text-base text-ink-soft">
+            Money movement with a ledger you can prove.
           </p>
         </div>
 
-        {error && (
-          <div className="bg-rose-950/80 border border-rose-700 p-4 rounded-xl flex items-start space-x-3 text-rose-200 text-sm">
-            <AlertCircle className="w-5 h-5 flex-shrink-0 text-rose-400 mt-0.5" />
-            <span>{error}</span>
-          </div>
-        )}
+        {/* Form Panel */}
+        <Panel hasDocumentHeader className="shadow-none">
+          <h1 className="font-serif text-xl font-medium text-ink mb-1">
+            Sign In
+          </h1>
+          <p className="text-[13px] text-ink-soft mb-6">
+            Enter your credentials to access your account ledger.
+          </p>
 
-        <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1">
-              Email Address
-            </label>
-            <div className="relative">
-              <Mail className="w-5 h-5 absolute left-3 top-3 text-slate-400" />
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="name@example.com"
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          {/* Rate-limit Live Countdown Banner */}
+          {rateLimitSeconds !== null && rateLimitSeconds > 0 && (
+            <div className="mb-5">
+              <Banner
+                type="warning"
+                title="Rate Limit Exceeded"
+                message={
+                  <span>
+                    Too many attempts. Try again in{' '}
+                    <span className="font-mono font-semibold">
+                      {rateLimitSeconds}s
+                    </span>
+                    .
+                  </span>
+                }
               />
             </div>
-          </div>
+          )}
 
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1">
-              Password
-            </label>
-            <div className="relative">
-              <Lock className="w-5 h-5 absolute left-3 top-3 text-slate-400" />
-              <input
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          {/* General Error Banner */}
+          {error && !rateLimitSeconds && (
+            <div className="mb-5">
+              <Banner
+                type="error"
+                message={error}
+                onClose={() => setError(null)}
               />
             </div>
-          </div>
+          )}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full flex items-center justify-center py-3 px-4 rounded-xl text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition shadow-lg disabled:opacity-50"
-          >
-            {loading ? 'Signing in...' : 'Sign In'}
-            <ArrowRight className="w-4 h-4 ml-2" />
-          </button>
-        </form>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <Input
+              label="Email Address"
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="user@example.com"
+              disabled={loading || (rateLimitSeconds !== null && rateLimitSeconds > 0)}
+            />
 
-        {/* Quick fill buttons for testing/demo */}
-        <div className="pt-4 border-t border-slate-700/60">
-          <p className="text-xs text-slate-400 mb-2 font-medium">Quick Fill Demo Credentials:</p>
-          <div className="flex gap-2">
+            <Input
+              label="Password"
+              type="password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              disabled={loading || (rateLimitSeconds !== null && rateLimitSeconds > 0)}
+            />
+
+            <div className="pt-2">
+              <Button
+                type="submit"
+                variant="primary"
+                loading={loading}
+                disabled={rateLimitSeconds !== null && rateLimitSeconds > 0}
+                className="w-full"
+              >
+                Sign In
+              </Button>
+            </div>
+          </form>
+
+          {/* Quick Demo Helper */}
+          <div className="mt-6 pt-4 border-t border-rule text-left">
+            <span className="text-[11.5px] font-mono uppercase tracking-wider text-ink-faint block mb-2">
+              Demo Access
+            </span>
             <button
               type="button"
               onClick={fillAdmin}
-              className="px-3 py-1.5 text-xs bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg transition"
+              className="text-xs font-mono text-ink-soft hover:text-green underline select-none"
             >
-              Demo Admin (admin@balancevault.com)
+              Fill Admin: admin@balancevault.com
             </button>
           </div>
-        </div>
+        </Panel>
 
-        <div className="text-center text-sm text-slate-400">
-          Don't have an account?{' '}
-          <Link to="/register" className="text-emerald-400 hover:text-emerald-300 font-medium">
-            Register here
+        {/* Footer Link */}
+        <div className="mt-4 text-left text-sm text-ink-soft">
+          No account?{' '}
+          <Link to="/register" className="text-green hover:underline font-semibold">
+            Open one.
           </Link>
         </div>
       </div>
     </div>
   );
 };
-
